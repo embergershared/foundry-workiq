@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "subscriptionCode": {
+      "value": "${AZURE_SUBSCRIPTION_CODE}"
+    },
+    "deploymentProfile": {
+      "value": "${DEPLOYMENT_PROFILE=core}"
+    },
+    "repository": {
+      "value": "${AZURE_REPOSITORY}"
+    },
+    "featureOverridesBase64": {
+      "value": "${AZURE_FEATURE_OVERRIDES_BASE64}"
+    },
+    "operatorPrincipalIdsCsv": {
+      "value": "${AZURE_OPERATOR_PRINCIPAL_IDS}"
+    },
+    "createdOn": {
+      "value": "${AZURE_CREATED_ON}"
+    },
+    "lastUpdatedOn": {
+      "value": "${AZURE_LAST_UPDATED_ON}"
+    }
+  }
+}

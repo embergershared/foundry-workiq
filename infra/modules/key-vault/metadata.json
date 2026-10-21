@@ -1,0 +1,30 @@
+{
+  "name": "key-vault",
+  "displayName": "Key Vault",
+  "description": "RBAC-authorized Key Vault. Private-only when a private endpoint subnet and DNS zone are supplied, otherwise public with a deny-by-default firewall.",
+  "kind": "resource",
+  "abbreviation": "kv",
+  "featureFlag": "keyVault",
+  "profiles": ["core", "private", "full"],
+  "providers": ["Microsoft.KeyVault"],
+  "privateEndpoints": [
+    {
+      "zoneKey": "keyVault",
+      "groupIds": ["vault"],
+      "dnsZone": "privatelink.vaultcore.azure.net",
+      "linkSuffix": "kv",
+      "connectionName": "key-vault"
+    }
+  ],
+  "roles": [
+    {
+      "name": "Key Vault Secrets User",
+      "id": "4633458b-17de-408a-b874-0445c86b69e6"
+    }
+  ],
+  "nameRule": "global",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

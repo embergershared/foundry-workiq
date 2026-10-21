@@ -1,0 +1,23 @@
+{
+  "name": "managed-identity",
+  "displayName": "Managed Identity",
+  "description": "User-assigned managed identity for workloads to reach Azure services without secrets.",
+  "kind": "resource",
+  "abbreviation": "id",
+  "featureFlag": "managedIdentity",
+  "profiles": [
+    "core",
+    "full",
+    "private"
+  ],
+  "providers": [
+    "Microsoft.ManagedIdentity"
+  ],
+  "privateEndpoints": [],
+  "roles": [],
+  "nameRule": "regional",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

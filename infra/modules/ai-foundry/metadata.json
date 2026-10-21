@@ -1,0 +1,35 @@
+{
+  "name": "ai-foundry",
+  "displayName": "Ai Foundry",
+  "description": "Microsoft Foundry (AIServices) account with local auth disabled, a Foundry project and serialized model deployments.",
+  "kind": "resource",
+  "abbreviation": "aif",
+  "featureFlag": "aiFoundry",
+  "profiles": [
+    "core",
+    "full",
+    "private"
+  ],
+  "providers": [
+    "Microsoft.CognitiveServices"
+  ],
+  "privateEndpoints": [],
+  "roles": [
+    {
+      "name": "Cognitive Services OpenAI User",
+      "id": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
+    },
+    {
+      "name": "Azure AI User",
+      "id": "53ca6127-db72-4b80-b1b0-d745d6d5456d"
+    }
+  ],
+  "nameRule": "global",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  },
+  "additionalAbbreviations": [
+    "proj"
+  ]
+}

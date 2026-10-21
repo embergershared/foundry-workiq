@@ -1,0 +1,24 @@
+{
+  "name": "container-apps-environment",
+  "displayName": "Container Apps Environment",
+  "description": "VNet-integrated workload-profiles Container Apps environment with Log Analytics logging and a named infrastructure resource group.",
+  "kind": "resource",
+  "abbreviation": "cae",
+  "featureFlag": "containerAppsEnvironment",
+  "profiles": [
+    "core",
+    "full",
+    "private"
+  ],
+  "providers": [
+    "Microsoft.App",
+    "Microsoft.OperationalInsights"
+  ],
+  "privateEndpoints": [],
+  "roles": [],
+  "nameRule": "regional",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

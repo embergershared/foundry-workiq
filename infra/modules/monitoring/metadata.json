@@ -1,0 +1,17 @@
+{
+  "name": "monitoring",
+  "displayName": "Log Analytics and Application Insights",
+  "description": "Workspace-based observability. Deployed by every profile because the core rung is defined as resource group, tags and telemetry.",
+  "kind": "composite",
+  "abbreviation": "law",
+  "featureFlag": null,
+  "profiles": ["core", "private", "full"],
+  "providers": ["Microsoft.OperationalInsights", "Microsoft.Insights"],
+  "privateEndpoints": [],
+  "roles": [],
+  "nameRule": "regional",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

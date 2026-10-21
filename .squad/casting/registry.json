@@ -1,0 +1,39 @@
+{
+  "agents": {
+    "lead": {
+      "persistent_name": "Morpheus",
+      "universe": "The Matrix",
+      "created_at": "2026-08-27T12:26:33.128-04:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "azure-infrastructure": {
+      "persistent_name": "Trinity",
+      "universe": "The Matrix",
+      "created_at": "2026-08-27T12:26:33.128-04:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "security": {
+      "persistent_name": "Neo",
+      "universe": "The Matrix",
+      "created_at": "2026-08-27T12:26:33.128-04:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "validation": {
+      "persistent_name": "Tank",
+      "universe": "The Matrix",
+      "created_at": "2026-08-27T12:26:33.128-04:00",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "documentation": {
+      "persistent_name": "Switch",
+      "universe": "The Matrix",
+      "created_at": "2026-08-27T12:26:33.128-04:00",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}

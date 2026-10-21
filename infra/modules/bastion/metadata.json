@@ -1,0 +1,17 @@
+{
+  "name": "bastion",
+  "displayName": "Azure Bastion",
+  "description": "Standard SKU Azure Bastion with native client tunneling, providing browser and RDP/SSH access to jumpboxes without public IP addresses on the virtual machines.",
+  "kind": "resource",
+  "abbreviation": "bast",
+  "featureFlag": "bastion",
+  "profiles": ["full"],
+  "providers": ["Microsoft.Network"],
+  "privateEndpoints": [],
+  "roles": [],
+  "nameRule": "regional",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

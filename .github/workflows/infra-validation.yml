@@ -1,0 +1,86 @@
+name: Infrastructure validation
+
+on:
+  pull_request:
+    paths:
+      - ".azure/**"
+      - ".github/instructions/**"
+      - ".github/workflows/infra-validation.yml"
+      - "infra/**"
+      - "scripts/**"
+      - "tests/**"
+      - "azure.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse JSON
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-ChildItem -Path . -Recurse -File -Filter *.json |
+            ForEach-Object {
+              try {
+                Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json -ErrorAction Stop | Out-Null
+              }
+              catch {
+                throw "Invalid JSON in $($_.FullName): $($_.Exception.Message)"
+              }
+            }
+
+      - name: Check PowerShell syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-ChildItem scripts, tests -Recurse -File -Filter *.ps1 |
+            ForEach-Object {
+              $tokens = $null
+              $errors = $null
+              [System.Management.Automation.Language.Parser]::ParseFile(
+                $_.FullName,
+                [ref]$tokens,
+                [ref]$errors
+              ) | Out-Null
+              if ($errors.Count -gt 0) {
+                $errors | ForEach-Object { Write-Error $_ }
+                exit 1
+              }
+            }
+
+      # The catalog index, the generated private DNS zone list and the module
+      # tables in docs/modules.md are all derived from
+      # infra/modules/*/metadata.json. A stale index means preflight and the
+      # DNS module disagree with the modules actually on disk.
+      - name: Check generated files are current
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./scripts/build-catalog.ps1 -Check
+          ./scripts/build-docs.ps1 -Check
+
+      # Covers naming equivalence, name-rule compliance, catalog conformance,
+      # Bicep build and lint, and the core/private/full profile matrix.
+      - name: Run the test suite
+        shell: pwsh
+        run: ./tests/run-tests.ps1
+
+      - name: Check Bicep formatting
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-ChildItem infra -Recurse -Filter *.bicep | ForEach-Object {
+            # Normalise line endings on both sides: the comparison must fail on
+            # formatting, not on the platform the check happens to run on.
+            $formatted = ((@(& az bicep format --file $_.FullName --stdout) -join "`n") -replace "`r", '').TrimEnd()
+            $current = ((Get-Content -LiteralPath $_.FullName -Raw) -replace "`r", '').TrimEnd()
+            if ($formatted -cne $current) {
+              throw "$($_.FullName) is not formatted. Run: az bicep format --file $($_.FullName)"
+            }
+          }

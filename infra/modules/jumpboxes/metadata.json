@@ -1,0 +1,23 @@
+{
+  "name": "jumpboxes",
+  "displayName": "Windows 11 and Ubuntu jumpboxes",
+  "description": "Optional developer desktops inside the virtual network, with no public IP addresses, optional Microsoft Entra login and optional auto-shutdown schedules.",
+  "kind": "composite",
+  "abbreviation": "vm-win",
+  "additionalAbbreviations": ["vm-lin", "nic"],
+  "featureFlag": "windowsVm",
+  "profiles": ["full"],
+  "providers": ["Microsoft.Compute", "Microsoft.Network", "Microsoft.DevTestLab"],
+  "privateEndpoints": [],
+  "roles": [
+    {
+      "name": "Virtual Machine User Login",
+      "id": "fb879df8-f326-4884-b1cf-06f3ad86be52"
+    }
+  ],
+  "nameRule": "regional",
+  "preflight": {
+    "checks": ["vmSkuAvailability", "windowsImage", "vcpuQuota"],
+    "requiresOperatorPrincipals": true
+  }
+}

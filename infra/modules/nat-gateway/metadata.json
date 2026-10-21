@@ -1,0 +1,17 @@
+{
+  "name": "nat-gateway",
+  "displayName": "NAT Gateway",
+  "description": "Standard NAT Gateway providing deterministic outbound egress for the jumpbox subnet. Required whenever Entra VM login is enabled, because the login extensions need outbound access.",
+  "kind": "resource",
+  "abbreviation": "natgw",
+  "featureFlag": "natGateway",
+  "profiles": ["private", "full"],
+  "providers": ["Microsoft.Network"],
+  "privateEndpoints": [],
+  "roles": [],
+  "nameRule": "regional",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

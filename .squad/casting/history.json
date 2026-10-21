@@ -1,0 +1,22 @@
+{
+  "universe_usage_history": [
+    {
+      "universe": "The Matrix",
+      "assignment_id": "azure-azd-private-starter-2026-08-27",
+      "used_at": "2026-08-27T12:26:33.128-04:00"
+    }
+  ],
+  "assignment_cast_snapshots": {
+    "azure-azd-private-starter-2026-08-27": {
+      "universe": "The Matrix",
+      "agents": {
+        "lead": "Morpheus",
+        "azure-infrastructure": "Trinity",
+        "security": "Neo",
+        "validation": "Tank",
+        "documentation": "Switch"
+      },
+      "created_at": "2026-08-27T12:26:33.128-04:00"
+    }
+  }
+}

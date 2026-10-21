@@ -1,0 +1,28 @@
+{
+  "name": "maps",
+  "displayName": "Maps",
+  "description": "Azure Maps Gen2 account for search and routing, accessed with Microsoft Entra ID.",
+  "kind": "resource",
+  "abbreviation": "map",
+  "featureFlag": "maps",
+  "profiles": [
+    "core",
+    "full",
+    "private"
+  ],
+  "providers": [
+    "Microsoft.Maps"
+  ],
+  "privateEndpoints": [],
+  "roles": [
+    {
+      "name": "Azure Maps Data Reader",
+      "id": "423170ca-a8f6-4b0f-8487-9e4eb8f49bfa"
+    }
+  ],
+  "nameRule": "regional",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

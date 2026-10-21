@@ -1,0 +1,28 @@
+# Squad: ignore runtime state (logs, inbox, sessions)
+.squad/orchestration-log/
+.squad/log/
+.squad/decisions/inbox/
+.squad/sessions/
+.squad/.scratch/
+.squad/.cache/
+# Squad: SubSquad activation file (local to this machine)
+.squad-workstream
+# Squad upgrades keep the replaced files as local backups
+*.local-backup
+
+# Azure Developer CLI local environment state and generated artifacts
+.azure/*/
+.env
+.env.*
+!.env.example
+*.bicep.cache
+infra/*.jsonc
+
+# AZD local state and generated artifacts
+.azure/**
+.azure/.gitignore
+!.azure/deployment-plan.md
+
+# Compiled ARM output. azd and az compile infra/main.bicep directly, so a
+# committed copy has no consumer and silently goes stale.
+infra/main.json

@@ -1,0 +1,41 @@
+{
+  "name": "storage",
+  "displayName": "Storage account",
+  "description": "StorageV2 account with blob and file private endpoints. Private-only when a private endpoint subnet and DNS zones are supplied, otherwise public with a deny-by-default firewall.",
+  "kind": "resource",
+  "abbreviation": "stacct",
+  "featureFlag": "storage",
+  "profiles": ["core", "private", "full"],
+  "providers": ["Microsoft.Storage"],
+  "privateEndpoints": [
+    {
+      "zoneKey": "blob",
+      "groupIds": ["blob"],
+      "dnsZone": "privatelink.blob.core.windows.net",
+      "linkSuffix": "blob",
+      "connectionName": "blob"
+    },
+    {
+      "zoneKey": "file",
+      "groupIds": ["file"],
+      "dnsZone": "privatelink.file.core.windows.net",
+      "linkSuffix": "file",
+      "connectionName": "file"
+    }
+  ],
+  "roles": [
+    {
+      "name": "Storage Blob Data Contributor",
+      "id": "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+    },
+    {
+      "name": "Storage File Data SMB Share Contributor",
+      "id": "0c867c2a-1d8c-454a-a3db-ab2ea1bdc8bb"
+    }
+  ],
+  "nameRule": "globalCompact",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

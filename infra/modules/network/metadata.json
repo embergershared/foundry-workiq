@@ -1,0 +1,17 @@
+{
+  "name": "network",
+  "displayName": "Virtual network, subnets and NSGs",
+  "description": "The /22 virtual network with Bastion, jumpbox and private endpoint subnets, each with a deny-by-default network security group.",
+  "kind": "composite",
+  "abbreviation": "vnet",
+  "featureFlag": "network",
+  "profiles": ["private", "full"],
+  "providers": ["Microsoft.Network"],
+  "privateEndpoints": [],
+  "roles": [],
+  "nameRule": "regional",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "key": "keyVault",
+    "module": "key-vault",
+    "zone": "privatelink.vaultcore.azure.net",
+    "linkSuffix": "kv"
+  },
+  {
+    "key": "blob",
+    "module": "storage",
+    "zone": "privatelink.blob.core.windows.net",
+    "linkSuffix": "blob"
+  },
+  {
+    "key": "file",
+    "module": "storage",
+    "zone": "privatelink.file.core.windows.net",
+    "linkSuffix": "file"
+  }
+]
