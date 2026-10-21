@@ -32,6 +32,12 @@
     "deployerPrincipalType": {
       "value": "${AZURE_PRINCIPAL_TYPE=User}"
     },
+    "apiManagementPublisherEmail": {
+      "value": "${AZURE_APIM_PUBLISHER_EMAIL}"
+    },
+    "apiManagementSku": {
+      "value": "${AZURE_APIM_SKU=BasicV2}"
+    },
     "createdOn": {
       "value": "${AZURE_CREATED_ON}"
     },

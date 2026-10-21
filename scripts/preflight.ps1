@@ -96,6 +96,7 @@ $featureSettings = [ordered] @{
     entraLogin        = $isFull
     shutdownSchedules = $isFull
     aiFoundry         = $false
+    apiManagement     = $false
     roleAssignments   = $true
 }
 
@@ -152,7 +153,8 @@ $moduleEnabled = @{
     'bastion'     = [bool] $featureSettings.bastion
     'nat-gateway' = [bool] $featureSettings.natGateway
     'jumpboxes'   = $anyVm
-    'ai-foundry'  = [bool] $featureSettings.aiFoundry
+    'ai-foundry'     = [bool] $featureSettings.aiFoundry
+    'api-management' = [bool] $featureSettings.apiManagement
 }
 
 $enabledModules = @(Get-EnabledCatalogModules -Modules $catalog.modules -Features $featureSettings -Composition $moduleEnabled)
@@ -274,6 +276,26 @@ foreach ($principalId in $operatorPrincipalIds) {
     }
     if (-not $seenPrincipalIds.Add($parsedPrincipalId)) {
         throw "Duplicate Entra operator principal ID '$principalId'."
+    }
+}
+
+# ---------------------------------------------------------------------------
+# API Management checks - skipped entirely unless the AI Gateway is deployed
+# ---------------------------------------------------------------------------
+
+if ($featureSettings.apiManagement) {
+    $publisherEmail = (& azd env get-value AZURE_APIM_PUBLISHER_EMAIL 2>$null)
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($publisherEmail) -or
+        $publisherEmail.Trim() -notmatch '^[^@\s]+@[^@\s]+\.[^@\s]+$') {
+        throw 'apiManagement requires a publisher email. Run: azd env set AZURE_APIM_PUBLISHER_EMAIL <email>'
+    }
+    $apimSku = (& azd env get-value AZURE_APIM_SKU 2>$null)
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($apimSku) -and
+        $apimSku.Trim() -cnotin @('BasicV2', 'StandardV2')) {
+        throw "AZURE_APIM_SKU '$($apimSku.Trim())' is not supported. Foundry AI Gateway needs a v2 tier: BasicV2 or StandardV2."
+    }
+    if (-not $featureSettings.aiFoundry) {
+        Write-Warning 'apiManagement is on without aiFoundry: the instance deploys, but there is no Foundry account to link it to or to grant roles on.'
     }
 }
 

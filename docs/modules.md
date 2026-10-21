@@ -98,6 +98,7 @@ a module has been provisioned anywhere, changing them replaces resources.
 | Module | Kind | Abbreviation | Profiles | Feature flag | Providers |
 |---|---|---|---|---|---|
 | [`ai-foundry`](../infra/modules/ai-foundry/README.md) | resource | `aif`, `proj` | `core`, `full`, `private` | `aiFoundry` | `Microsoft.CognitiveServices` |
+| [`api-management`](../infra/modules/api-management/README.md) | resource | `apim` | `core`, `full`, `private` | `apiManagement` | `Microsoft.ApiManagement` |
 | [`bastion`](../infra/modules/bastion/README.md) | resource | `bast` | `full` | `bastion` | `Microsoft.Network` |
 | [`container-apps-environment`](../infra/modules/container-apps-environment/README.md) | resource | `cae` | `core`, `full`, `private` | `containerAppsEnvironment` | `Microsoft.App`, `Microsoft.OperationalInsights` |
 | [`container-registry`](../infra/modules/container-registry/README.md) | resource | `cr` | `core`, `full`, `private` | `containerRegistry` | `Microsoft.ContainerRegistry` |
