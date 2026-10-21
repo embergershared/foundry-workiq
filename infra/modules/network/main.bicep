@@ -37,6 +37,11 @@ param containerAppsNetworkSecurityGroupName string = ''
 
 var deployContainerAppsSubnet = !empty(containerAppsSubnetPrefix)
 
+// ARM evaluates both branches of if(), so the subnet's NSG resourceId() is
+// built even when the subnet is skipped, and an empty name makes it malformed.
+// The placeholder is never deployed because the NSG is conditional too.
+var containerAppsNsgName = deployContainerAppsSubnet ? containerAppsNetworkSecurityGroupName : 'unused'
+
 var bastionSubnetName = 'AzureBastionSubnet'
 
 resource bastionNsg 'Microsoft.Network/networkSecurityGroups@2024-07-01' = if (deployJumpboxSubnets) {
@@ -361,7 +366,7 @@ resource privateEndpointNsg 'Microsoft.Network/networkSecurityGroups@2024-07-01'
 // (rather than leaving the subnet bare) also keeps policy-generated NSGs, with
 // names outside the convention, from being attached.
 resource containerAppsNsg 'Microsoft.Network/networkSecurityGroups@2024-07-01' = if (deployContainerAppsSubnet) {
-  name: containerAppsNetworkSecurityGroupName
+  name: containerAppsNsgName
   location: location
   tags: tags
   properties: {
