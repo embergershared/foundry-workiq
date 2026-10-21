@@ -16,7 +16,7 @@ Microsoft Foundry (AIServices) account with local auth disabled, a Foundry proje
 
 A Microsoft Foundry (AIServices) account with key authentication disabled, a Foundry project for agents, and model deployments. Operations on one account conflict when they overlap, so the project is created first and deployments run one at a time.
 
-Grant workloads `Cognitive Services OpenAI User` on the account for chat and Realtime, and `Azure AI User` (Foundry User) on the project to run agents.
+Grant workloads `Cognitive Services OpenAI User` on the account for chat and Realtime. The module grants `Foundry User` (formerly Azure AI User) to `userPrincipals` on both the account and the project, which agents that call tools on behalf of a user need, and `Foundry Project Manager` to `projectManagerPrincipals` on the project, which creating connections needs.
 
 ## Parameters
 
@@ -29,6 +29,9 @@ Grant workloads `Cognitive Services OpenAI User` on the account for chat and Rea
 | `projectDisplayName` | string | no |  |
 | `deployments` | array | no | `[{ name, model, version, sku?, capacity }]`; `sku` defaults to `GlobalStandard` |
 | `publicNetworkAccess` | string | no | Default `Enabled` |
+| `userPrincipals` | array | no | `[{ principalId, principalType }]`; Foundry User on the account and the project |
+| `projectManagerPrincipals` | array | no | `[{ principalId, principalType }]`; Foundry Project Manager on the project |
+| `enableRoleAssignments` | bool | no | Default `true` |
 
 ## Outputs
 

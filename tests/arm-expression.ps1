@@ -396,6 +396,9 @@ function Invoke-ArmCall {
             return $false
         }
         'bool' { return ConvertTo-ArmBoolean $values[0] }
+        # Bicep emits true()/false() for a boolean literal used as a `??` fallback.
+        'true' { return $true }
+        'false' { return $false }
         'createObject' {
             $object = @{}
             for ($i = 0; ($i + 1) -lt $values.Count; $i += 2) {

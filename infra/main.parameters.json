@@ -23,6 +23,15 @@
     "operatorPrincipalIdsCsv": {
       "value": "${AZURE_OPERATOR_PRINCIPAL_IDS}"
     },
+    "workIqUsersGroupId": {
+      "value": "${WORKIQ_USERS_GROUP_ID}"
+    },
+    "deployerPrincipalId": {
+      "value": "${AZURE_PRINCIPAL_ID}"
+    },
+    "deployerPrincipalType": {
+      "value": "${AZURE_PRINCIPAL_TYPE=User}"
+    },
     "createdOn": {
       "value": "${AZURE_CREATED_ON}"
     },

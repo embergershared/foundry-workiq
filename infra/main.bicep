@@ -92,10 +92,13 @@ param windowsMdmId string = ''
 @description('Create VM auto-shutdown schedules. Defaults on for the full profile.')
 param enableShutdownSchedules bool?
 
+@description('Deploy the Microsoft Foundry account, project and model deployments for the Work IQ agent. Off in every profile; enable it with this parameter or the aiFoundry override. Implies the Key Vault that holds the Work IQ client secret.')
+param enableAiFoundry bool?
+
 @description('Create configured operator RBAC assignments. Disable when the deployer lacks roleAssignments/write.')
 param enableRoleAssignments bool = true
 
-@description('Base64-encoded JSON object overriding profile feature flags. Supported keys: network, keyVault, storage, bastion, windowsVm, linuxVm, natGateway, entraLogin, shutdownSchedules, roleAssignments. natGateway and entraLogin must match.')
+@description('Base64-encoded JSON object overriding profile feature flags. Supported keys: network, keyVault, storage, bastion, windowsVm, linuxVm, natGateway, entraLogin, shutdownSchedules, aiFoundry, roleAssignments. natGateway and entraLogin must match.')
 param featureOverridesBase64 string = 'e30='
 
 @description('Comma-separated Entra user or group object IDs that receive VM login and private data-plane roles.')
@@ -149,6 +152,32 @@ param logRetentionInDays int = 30
 @description('Log Analytics daily ingestion cap in GB.')
 @minValue(1)
 param logDailyCapGb int = 1
+
+@description('Azure region for the Foundry account. Pick one with model availability and quota.')
+param aiFoundryLocation string = location
+
+@description('Foundry model deployments: [{ name, model, version, sku?, capacity }]. sku defaults to GlobalStandard.')
+param aiFoundryModelDeployments array = [
+  {
+    name: 'gpt-5-mini'
+    model: 'gpt-5-mini'
+    version: '2025-08-07'
+    capacity: 50
+  }
+]
+
+@description('Object ID of the Work IQ users security group from scripts/bootstrap-tenant.ps1. Granted Foundry User on the Foundry account and project.')
+param workIqUsersGroupId string = ''
+
+@description('Object ID of the principal running the deployment (azd sets AZURE_PRINCIPAL_ID). Granted Foundry Project Manager and Foundry User, so it can create the Work IQ connection, and Key Vault Secrets Officer, so it can store the client secret.')
+param deployerPrincipalId string = ''
+
+@description('Type of the deploying principal: User for an interactive deployment, ServicePrincipal for CI.')
+@allowed([
+  'User'
+  'ServicePrincipal'
+])
+param deployerPrincipalType string = 'User'
 
 @description('Local auto-shutdown time in HHmm format.')
 @minLength(4)
@@ -337,6 +366,24 @@ var linuxVmName = azName(
   environmentName,
   ''
 )
+var aiFoundryLocationCode = locationCodeFor(aiFoundryLocation)
+var aiFoundryName = globalName(
+  abbreviations.aiFoundry,
+  aiFoundryLocationCode,
+  subscriptionCode,
+  environmentName,
+  shortUniqueSuffix,
+  '-',
+  64
+)
+var aiFoundryProjectName = azName(
+  abbreviations.aiFoundryProject,
+  tenantCode,
+  aiFoundryLocationCode,
+  subscriptionCode,
+  environmentName,
+  ''
+)
 var linuxNicName = azName(
   abbreviations.networkInterface,
   tenantCode,
@@ -371,6 +418,7 @@ var featureSettings = union(
     natGateway: enableNatGateway ?? isFull
     entraLogin: enableEntraLogin ?? isFull
     shutdownSchedules: enableShutdownSchedules ?? isFull
+    aiFoundry: enableAiFoundry ?? false
     roleAssignments: enableRoleAssignments
   },
   json(base64ToString(featureOverridesBase64))
@@ -381,6 +429,7 @@ var deployLinuxVm = bool(featureSettings.linuxVm)
 var deployNatGateway = bool(featureSettings.natGateway)
 var deployEntraLogin = bool(featureSettings.entraLogin)
 var deployShutdownSchedules = bool(featureSettings.shutdownSchedules)
+var deployAiFoundry = bool(featureSettings.aiFoundry)
 var assignRoles = bool(featureSettings.roleAssignments)
 var deployAnyVm = deployWindowsVm || deployLinuxVm
 
@@ -388,12 +437,32 @@ var deployAnyVm = deployWindowsVm || deployLinuxVm
 // message. These derivations keep a direct `az deployment sub create` that
 // bypasses the azd hooks from producing dangling references.
 var deployNetwork = bool(featureSettings.network) || deployBastion || deployAnyVm
-var deployKeyVault = bool(featureSettings.keyVault) || deployAnyVm
+var deployKeyVault = bool(featureSettings.keyVault) || deployAnyVm || deployAiFoundry
 var deployStorage = bool(featureSettings.storage)
 
 var operatorPrincipalIds = empty(operatorPrincipalIdsCsv)
   ? []
   : map(split(operatorPrincipalIdsCsv, ','), principalId => trim(principalId))
+
+var deployerPrincipals = empty(deployerPrincipalId)
+  ? []
+  : [
+      {
+        principalId: deployerPrincipalId
+        principalType: deployerPrincipalType
+      }
+    ]
+var foundryUserPrincipals = concat(
+  empty(workIqUsersGroupId)
+    ? []
+    : [
+        {
+          principalId: workIqUsersGroupId
+          principalType: 'Group'
+        }
+      ],
+  deployerPrincipals
+)
 
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-11-01' = {
   name: resourceGroupName
@@ -477,6 +546,7 @@ module keyVault './modules/key-vault/main.bicep' = if (deployKeyVault) {
     linuxAdminUsername: linuxAdminUsername
     enableRoleAssignments: assignRoles
     operatorPrincipalIds: operatorPrincipalIds
+    secretsOfficerPrincipalIds: deployAiFoundry && !empty(deployerPrincipalId) ? [deployerPrincipalId] : []
   }
 }
 
@@ -548,6 +618,20 @@ module jumpboxes './modules/jumpboxes/main.bicep' = if (deployAnyVm) {
     keyVault
   ]
 }
+module aiFoundry './modules/ai-foundry/main.bicep' = if (deployAiFoundry) {
+  name: 'ai-foundry'
+  scope: resourceGroup
+  params: {
+    name: aiFoundryName
+    projectName: aiFoundryProjectName
+    location: aiFoundryLocation
+    tags: tags
+    deployments: aiFoundryModelDeployments
+    userPrincipals: foundryUserPrincipals
+    projectManagerPrincipals: deployerPrincipals
+    enableRoleAssignments: assignRoles
+  }
+}
 // #endregion modules
 
 resource deployedKeyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
@@ -565,3 +649,7 @@ output AZURE_APPLICATION_INSIGHTS_NAME string = monitoring.outputs.applicationIn
 output AZURE_BASTION_NAME string = deployBastion ? bastion!.outputs.name : ''
 output AZURE_WINDOWS_VM_NAME string = deployWindowsVm ? jumpboxes!.outputs.windowsVmName : ''
 output AZURE_LINUX_VM_NAME string = deployLinuxVm ? jumpboxes!.outputs.linuxVmName : ''
+output FOUNDRY_ACCOUNT_NAME string = deployAiFoundry ? aiFoundry!.outputs.name : ''
+output FOUNDRY_PROJECT_NAME string = deployAiFoundry ? aiFoundry!.outputs.projectName : ''
+output FOUNDRY_PROJECT_ID string = deployAiFoundry ? aiFoundry!.outputs.projectId : ''
+output FOUNDRY_PROJECT_ENDPOINT string = deployAiFoundry ? aiFoundry!.outputs.projectEndpoint : ''

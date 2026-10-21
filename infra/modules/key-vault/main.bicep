@@ -26,10 +26,16 @@ param linuxAdminUsername string
 param linuxAdminPassword string = newGuid()
 param enableRoleAssignments bool = true
 param operatorPrincipalIds array = []
+@description('Entra object IDs that write secrets, for example the deployer that stores the Work IQ client secret.')
+param secretsOfficerPrincipalIds array = []
 
 var keyVaultSecretsUserRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '4633458b-17de-408a-b874-0445c86b69e6'
+)
+var keyVaultSecretsOfficerRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  'b86a8fe4-44ce-4948-aee5-eccb2c155cd7'
 )
 
 // One module body serves every profile. With both private-networking inputs
@@ -150,6 +156,17 @@ resource secretReaderAssignments 'Microsoft.Authorization/roleAssignments@2022-0
     properties: {
       principalId: principalId
       roleDefinitionId: keyVaultSecretsUserRoleId
+    }
+  }
+]
+
+resource secretsOfficerAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for principalId in secretsOfficerPrincipalIds: if (enableRoleAssignments) {
+    name: guid(keyVault.id, principalId, keyVaultSecretsOfficerRoleId)
+    scope: keyVault
+    properties: {
+      principalId: principalId
+      roleDefinitionId: keyVaultSecretsOfficerRoleId
     }
   }
 ]
