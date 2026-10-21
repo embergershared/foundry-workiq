@@ -1,7 +1,8 @@
 # Work IQ on Foundry: automated deployment plan
 
-Status: **Phases 0 and 1 are implemented, not yet deployed to a tenant.
-Phases 2 to 4 are still a plan.**
+Status: **Phases 0, 1 and 2 are implemented. Phases 0 and 1 have run in the
+sandbox environment; the Phase 2 hook has not run against a tenant yet.
+Phases 3 and 4 are still a plan.**
 
 Source: [Connect agents to Microsoft 365 with Work IQ (preview), .NET pivot](https://learn.microsoft.com/azure/foundry/agents/how-to/tools/work-iq?pivots=dotnet),
 plus the [Work IQ A2A quickstart](https://learn.microsoft.com/microsoft-365/copilot/extensibility/work-iq-api-quickstart)
@@ -159,35 +160,56 @@ also deploys the Key Vault. `infra/main.parameters.json` reads
 
 ### Phase 2: Connection wiring (`postprovision` hook, `scripts/configure-workiq.ps1`)
 
-9. **Secret.** If Key Vault has no current `workiq-client-secret`, run
-   `az ad app credential reset --id $WORKIQ_APP_ID --append --display-name foundry-workiq --years 1`
-   and pipe the value straight to `az keyvault secret set` with an
-   `expires` attribute. Never echo it, never `azd env set` it (azd writes
-   `.env` files in plain text).
-10. **Connection.** `az rest --method put` to
-    `.../accounts/{account}/projects/{project}/connections/{name}?api-version=2025-04-01-preview`
-    with the body from the article (`category: RemoteA2A`, `authType: OAuth2`,
-    tenant-specific authorize/token/refresh URLs, scopes
-    `api://workiq.svc.cloud.microsoft/WorkIQAgent.Ask` and `offline_access`).
-    Send the body from a temporary file in the scratch directory that is
-    deleted in a `finally` block, so the secret never shows on a command line.
-    The connection is immutable: when the client ID or secret changes, the
-    hook deletes and recreates it (the article: "You can't edit connection
-    fields after creation").
-11. **Redirect URI.** Read `properties.oauthRedirectUrl` from the PUT response,
-    merge it into the app's existing `web.redirectUris` with
-    `az ad app update --web-redirect-uris`, and `azd env set WORKIQ_REDIRECT_URI`
-    so the next bootstrap run passes it to Graph Bicep instead of removing it.
-12. **Why not Bicep for the connection?** The ARM type
+Implemented. `azure.yaml` runs the script after every `azd provision`; it
+does nothing unless `FOUNDRY_PROJECT_ID` is set. Run it by hand with
+`-RotateSecret` to rotate the client secret, or `-Force` to recreate the
+connection.
+
+9. **Fast path.** The connection carries non-secret markers in its
+   `metadata`: `WorkIqAppId`, `WorkIqSecretVersion` and
+   `WorkIqSecretExpiresOn`. When they match the app, the secret is not due
+   for renewal (`-RenewWithinDays`, default 30), and the redirect URL is on the
+   app, the script changes nothing and never touches Key Vault. A connection
+   without markers, such as one created in the portal, is replaced.
+10. **Secret.** The script reuses `workiq-client-secret` from Key Vault when
+    its `appId` tag matches and it is not due for renewal. Otherwise it calls
+    Graph `addPassword` (display name `foundry-workiq-<environment>`,
+    default 180 days) and stores the value with an expiry and `appId`/`keyId`
+    tags. The secret only travels through memory and temporary files deleted
+    in `finally` blocks; it never reaches a command line, the azd `.env`, or
+    the output.
+11. **Key Vault firewall.** A vault without a private endpoint is public with
+    a deny-by-default firewall. The script adds a /32 rule for this machine's
+    public IP (looked up with `https://api.ipify.org`) only for the secret
+    read or write, and removes it in a `finally` block. The next
+    `azd provision` resets the rules too, because the template declares none.
+    A vault with public access disabled is never opened; run the script from
+    inside its virtual network, for example from the jumpbox. Key Vault and
+    connection calls retry for up to three minutes while new role assignments
+    and the firewall rule propagate.
+12. **Connection.** It cannot be edited, so the script deletes it and `PUT`s
+    it again (`api-version=2025-04-01-preview`, `RemoteA2A`, `OAuth2`,
+    tenant-specific URLs, scopes `api://workiq.svc.cloud.microsoft/WorkIQAgent.Ask`
+    and `offline_access`, `isSharedToAll: true`). The body goes through a
+    temporary file. After a new secret is in use, older passwords with the same
+    display name are removed from the app.
+13. **Redirect URI.** The connection returns `properties.redirectUrl` (of
+    the form `https://global.consent.azure-apim.net/redirect/<connector>`).
+    The script adds it to the app's web redirect URIs, keeps the others, drops
+    this environment's previous value if it changed, and records
+    `WORKIQ_REDIRECT_URI`, `WORKIQ_CONNECTION_NAME` (default `workiq`) and
+    `WORKIQ_CONNECTION_ID` in the azd environment. `bootstrap-tenant.ps1`
+    keeps the app's existing redirect URIs, so re-running it does not undo
+    this.
+14. **Why not Bicep for the connection?** The ARM type
     `Microsoft.CognitiveServices/accounts/projects/connections` exists, but
     putting the secret in a deployment parameter stores it in deployment
-    history, and the redirect URL then has to round-trip through outputs. Keep
-    it in the hook unless a later API version supports Key Vault references
-    for OAuth2 connections.
+    history. Keep it in the hook unless a later API version supports Key Vault
+    references for OAuth2 connections.
 
 ### Phase 3: The .NET agent (`src/WorkIQAgent`)
 
-13. A console project that mirrors the article's .NET prompt-agent sample:
+15. A console project that mirrors the article's .NET prompt-agent sample:
     `Azure.AI.Projects` (pin the version that ships `WorkIQPreviewTool`) and
     `Azure.Identity`. It reads `FOUNDRY_PROJECT_ENDPOINT` and
     `WORKIQ_CONNECTION_NAME` from `azd env get-values`, resolves the connection
@@ -198,17 +220,17 @@ also deploys the Key Vault. `infra/main.parameters.json` reads
 
 ### Phase 4: Preflight, tests and docs (fit the repository's gates)
 
-14. `scripts/preflight.ps1`: when `aiFoundry` is on, check that the
+16. `scripts/preflight.ps1`: when `aiFoundry` is on, check that the
     `WORKIQ_APP_ID` and `WORKIQ_USERS_GROUP_ID` azd env values exist, that the
     Work IQ service principal exists (`az ad sp show --id fdcc1f02-…`), that the
     admin consent grant exists, and that model quota is available in the region.
-15. `tests/`: a module test for the new connection/role wiring, catalog
+17. `tests/`: a module test for the new connection/role wiring, catalog
     conformance for any new module (`scripts/new-module.ps1`), and
     `build-catalog.ps1 -Check` / `build-docs.ps1 -Check`.
-16. Docs: a Work IQ section in `docs/deployment.md` (bootstrap, roles, the one
+18. Docs: a Work IQ section in `docs/deployment.md` (bootstrap, roles, the one
     portal step), and a secret-rotation runbook: append a new password, update
     Key Vault, recreate the connection, then remove the old password.
-17. Record decisions in `.azure/deployment-plan.md`: no toolbox (direct
+19. Record decisions in `.azure/deployment-plan.md`: no toolbox (direct
     `WorkIQPreviewTool` on a prompt agent), the data-boundary warning
     from the article (Work IQ traffic can leave the Azure compliance boundary),
     preview status, and that `publicNetworkAccess` stays `Enabled` for now.

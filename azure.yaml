@@ -18,3 +18,8 @@ hooks:
       }
       ./scripts/set-deployment-tags.ps1
       ./scripts/preflight.ps1
+  postprovision:
+    shell: pwsh
+    run: |
+      # Creates the Work IQ connection; a no-op unless aiFoundry is deployed.
+      ./scripts/configure-workiq.ps1
