@@ -120,8 +120,10 @@ run the script yourself before the first deployment:
 
 Then record your own tenants in both files, as described below. Preflight and
 Bicep fail closed until the deployment's tenant is listed, so the example
-catalog cannot be deployed by mistake. Commit both files; they are this
-repository's specifics from then on, and the workflow never runs again.
+catalog cannot be deployed by mistake. This repository gitignores both files so
+its tenant and subscription IDs are never committed: each clone keeps its own
+copies, and CI restores the examples with `scripts/init-from-template.ps1`.
+The workflow never runs again.
 
 ### Deploy to another tenant or subscription
 

@@ -23,6 +23,11 @@ infra/*.jsonc
 .azure/.gitignore
 !.azure/deployment-plan.md
 
+# This repository's tenant and subscription IDs stay local. A fresh clone and CI
+# start from the .example files: run ./scripts/init-from-template.ps1.
+infra/core/tenant-codes.json
+docs/targets.md
+
 # Compiled ARM output. azd and az compile infra/main.bicep directly, so a
 # committed copy has no consumer and silently goes stale.
 infra/main.json

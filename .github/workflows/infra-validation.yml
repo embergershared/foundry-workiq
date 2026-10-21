@@ -21,6 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # tenant-codes.json and targets.md are gitignored, but naming.bicep and
+      # the tests load the catalog, so CI runs against the example values.
+      - name: Restore the example deployment targets
+        shell: pwsh
+        run: ./scripts/init-from-template.ps1
+
       - name: Parse JSON
         shell: pwsh
         run: |
