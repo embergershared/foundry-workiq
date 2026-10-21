@@ -128,8 +128,8 @@ A `core` deployment therefore performs no `Microsoft.Network` or
 ## Expert feature overrides
 
 Supported Boolean keys are `network`, `keyVault`, `storage`, `bastion`,
-`windowsVm`, `linuxVm`, `natGateway`, `entraLogin`, `shutdownSchedules`, and
-`roleAssignments`.
+`windowsVm`, `linuxVm`, `natGateway`, `entraLogin`, `shutdownSchedules`,
+`aiFoundry`, and `roleAssignments`.
 
 ```powershell
 azd env set AZURE_FEATURE_OVERRIDES_JSON '{"keyVault":true,"storage":true}'
@@ -147,6 +147,12 @@ Dependency rules fail preflight:
   peering, or VM public-IP access path.
 - Enabling Bastion or a VM implies the network: the template derives
   `deployNetwork` from them, so you never have to enable `network` by hand.
+- `aiFoundry` is off in every profile. Enabling it deploys the Foundry account,
+  project and model deployments for the Work IQ agent, and implies the Key Vault
+  that holds the Work IQ client secret. Preflight requires the tenant bootstrap
+  first: the `WORKIQ_APP_ID` and `WORKIQ_USERS_GROUP_ID` azd values, the Work IQ
+  service principal, and tenant-wide consent for `WorkIQAgent.Ask`. See
+  [Work IQ on Foundry](workiq-deployment-plan.md).
 - Full-profile Entra extension installation and authentication require NAT
   egress. Do not disable NAT alone.
 - An expert air-gapped deployment **must** set both to false:

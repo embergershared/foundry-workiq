@@ -11,6 +11,10 @@
 //
 // The account name is also its custom subdomain, which must be globally unique:
 // build it with globalName(abbreviations.aiFoundry, ..., '-', 64).
+//
+// Foundry User is granted on both the account and the project: agents that
+// call tools on behalf of a user fail with "Principal does not have access to
+// API/Operation" when either scope is missing.
 
 @description('Account name and custom subdomain.')
 @minLength(2)
@@ -40,6 +44,34 @@ param deployments array = []
   'Disabled'
 ])
 param publicNetworkAccess string = 'Enabled'
+
+@description('Principals that build with and run agents in the project: [{ principalId, principalType }]. Granted Foundry User on the account and the project.')
+param userPrincipals principal[] = []
+
+@description('Principals that manage the project, including its connections: [{ principalId, principalType }]. Granted Foundry Project Manager on the project.')
+param projectManagerPrincipals principal[] = []
+
+@description('Create the role assignments above. Disable when the deployer lacks roleAssignments/write.')
+param enableRoleAssignments bool = true
+
+@description('An Entra principal and its type, so role assignments do not wait on directory replication.')
+type principal = {
+  @minLength(36)
+  @maxLength(36)
+  principalId: string
+  principalType: 'User' | 'Group' | 'ServicePrincipal'
+}
+
+// Role definition IDs, not names: the Foundry roles were renamed from Azure AI
+// User and Azure AI Project Manager, and the IDs did not change.
+var foundryUserRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '53ca6127-db72-4b80-b1b0-d745d6d5456d'
+)
+var foundryProjectManagerRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  'eadc314b-1a2d-4efa-be10-5d325db5065e'
+)
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: name
@@ -93,6 +125,42 @@ resource modelDeployments 'Microsoft.CognitiveServices/accounts/deployments@2025
     dependsOn: [
       project
     ]
+  }
+]
+
+resource accountUserAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for user in userPrincipals: if (enableRoleAssignments) {
+    name: guid(account.id, user.principalId, foundryUserRoleId)
+    scope: account
+    properties: {
+      principalId: user.principalId
+      principalType: user.principalType
+      roleDefinitionId: foundryUserRoleId
+    }
+  }
+]
+
+resource projectUserAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for user in userPrincipals: if (enableRoleAssignments) {
+    name: guid(project.id, user.principalId, foundryUserRoleId)
+    scope: project
+    properties: {
+      principalId: user.principalId
+      principalType: user.principalType
+      roleDefinitionId: foundryUserRoleId
+    }
+  }
+]
+
+resource projectManagerAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for manager in projectManagerPrincipals: if (enableRoleAssignments) {
+    name: guid(project.id, manager.principalId, foundryProjectManagerRoleId)
+    scope: project
+    properties: {
+      principalId: manager.principalId
+      principalType: manager.principalType
+      roleDefinitionId: foundryProjectManagerRoleId
+    }
   }
 ]
 

@@ -165,6 +165,7 @@ function Get-ProfileFeatureFlags {
         enableNatGateway        = $null
         enableEntraLogin        = $null
         enableShutdownSchedules = $null
+        enableAiFoundry         = $null
         enableRoleAssignments   = $EnableRoleAssignments
         featureOverridesBase64  = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($json))
     }
@@ -173,7 +174,7 @@ function Get-ProfileFeatureFlags {
     foreach ($name in @(
             'deployNetwork', 'deployKeyVault', 'deployStorage', 'deployBastion',
             'deployWindowsVm', 'deployLinuxVm', 'deployNatGateway', 'deployEntraLogin',
-            'deployShutdownSchedules', 'deployAnyVm', 'assignRoles')) {
+            'deployShutdownSchedules', 'deployAnyVm', 'deployAiFoundry', 'assignRoles')) {
         $expression = $Template.variables.$name
         if ($null -eq $expression) {
             throw "infra/main.bicep no longer defines the variable '$name'."

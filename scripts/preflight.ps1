@@ -95,6 +95,7 @@ $featureSettings = [ordered] @{
     natGateway        = $isFull
     entraLogin        = $isFull
     shutdownSchedules = $isFull
+    aiFoundry         = $false
     roleAssignments   = $true
 }
 
@@ -127,7 +128,7 @@ if ($anyVm -and -not $featureSettings.bastion) {
 # The same defensive derivations infra/main.bicep applies, so preflight and the
 # template agree on what is actually deployed.
 $deployNetwork = $featureSettings.network -or $featureSettings.bastion -or $anyVm
-$deployKeyVault = $featureSettings.keyVault -or $anyVm
+$deployKeyVault = $featureSettings.keyVault -or $anyVm -or $featureSettings.aiFoundry
 $deployStorage = [bool] $featureSettings.storage
 
 # ---------------------------------------------------------------------------
@@ -151,6 +152,7 @@ $moduleEnabled = @{
     'bastion'     = [bool] $featureSettings.bastion
     'nat-gateway' = [bool] $featureSettings.natGateway
     'jumpboxes'   = $anyVm
+    'ai-foundry'  = [bool] $featureSettings.aiFoundry
 }
 
 $enabledModules = @(Get-EnabledCatalogModules -Modules $catalog.modules -Features $featureSettings -Composition $moduleEnabled)
@@ -272,6 +274,41 @@ foreach ($principalId in $operatorPrincipalIds) {
     }
     if (-not $seenPrincipalIds.Add($parsedPrincipalId)) {
         throw "Duplicate Entra operator principal ID '$principalId'."
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Work IQ checks - skipped entirely unless the Foundry account is deployed
+# ---------------------------------------------------------------------------
+
+if ($featureSettings.aiFoundry) {
+    $bootstrapHint = 'Run ./scripts/bootstrap-tenant.ps1 once for this tenant; see docs/workiq-deployment-plan.md.'
+    $workIqAppId = 'fdcc1f02-fc51-4226-8753-f668596af7f7'
+
+    foreach ($name in @('WORKIQ_APP_ID', 'WORKIQ_USERS_GROUP_ID')) {
+        $value = (& azd env get-value $name 2>$null)
+        $parsedValue = [Guid]::Empty
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($value) -or
+            -not [Guid]::TryParseExact($value.Trim(), 'D', [ref] $parsedValue)) {
+            throw "aiFoundry requires the azd environment value '$name'. $bootstrapHint"
+        }
+    }
+    $connectionAppId = (& azd env get-value WORKIQ_APP_ID 2>$null).Trim()
+
+    $null = & az ad sp show --id $workIqAppId --only-show-errors --output none 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "The Work IQ service principal ($workIqAppId) does not exist in this tenant. $bootstrapHint"
+    }
+
+    $grants = Invoke-AzJson -Arguments @(
+        'rest', '--method', 'get',
+        '--url', "https://graph.microsoft.com/v1.0/servicePrincipals(appId='$connectionAppId')/oauth2PermissionGrants"
+    )
+    $consented = @($grants.value | Where-Object {
+            $_.consentType -eq 'AllPrincipals' -and (" $($_.scope) " -like '* WorkIQAgent.Ask *')
+        }).Count -gt 0
+    if (-not $consented) {
+        throw "The Work IQ app '$connectionAppId' has no tenant-wide admin consent for WorkIQAgent.Ask. $bootstrapHint"
     }
 }
 

@@ -20,8 +20,12 @@
       "id": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
     },
     {
-      "name": "Azure AI User",
+      "name": "Foundry User",
       "id": "53ca6127-db72-4b80-b1b0-d745d6d5456d"
+    },
+    {
+      "name": "Foundry Project Manager",
+      "id": "eadc314b-1a2d-4efa-be10-5d325db5065e"
     }
   ],
   "nameRule": "global",

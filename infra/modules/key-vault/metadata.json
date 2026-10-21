@@ -20,6 +20,10 @@
     {
       "name": "Key Vault Secrets User",
       "id": "4633458b-17de-408a-b874-0445c86b69e6"
+    },
+    {
+      "name": "Key Vault Secrets Officer",
+      "id": "b86a8fe4-44ce-4948-aee5-eccb2c155cd7"
     }
   ],
   "nameRule": "global",

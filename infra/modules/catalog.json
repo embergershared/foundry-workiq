@@ -29,8 +29,12 @@
           "id": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
         },
         {
-          "name": "Azure AI User",
+          "name": "Foundry User",
           "id": "53ca6127-db72-4b80-b1b0-d745d6d5456d"
+        },
+        {
+          "name": "Foundry Project Manager",
+          "id": "eadc314b-1a2d-4efa-be10-5d325db5065e"
         }
       ],
       "preflight": {
@@ -187,6 +191,10 @@
         {
           "name": "Key Vault Secrets User",
           "id": "4633458b-17de-408a-b874-0445c86b69e6"
+        },
+        {
+          "name": "Key Vault Secrets Officer",
+          "id": "b86a8fe4-44ce-4948-aee5-eccb2c155cd7"
         }
       ],
       "preflight": {

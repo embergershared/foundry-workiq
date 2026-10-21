@@ -26,6 +26,7 @@ $deploymentToModule = @{
     storage    = 'storage'
     bastion    = 'bastion'
     jumpboxes  = 'jumpboxes'
+    aiFoundry  = 'ai-foundry'
 }
 
 function Get-BicepFilesUnderTest {
@@ -33,7 +34,7 @@ function Get-BicepFilesUnderTest {
     [OutputType([string[]])]
     param()
 
-    $files = @($mainBicep)
+    $files = @($mainBicep, (Get-RepoPath 'infra/entra/main.bicep'))
     $files += @(Get-ChildItem -LiteralPath (Get-RepoPath 'infra/core') -Filter '*.bicep' -File |
             ForEach-Object { $_.FullName })
     $files += @($catalog.modules | ForEach-Object { Get-RepoPath $_.path })
@@ -330,4 +331,52 @@ Test-Case 'role assignments can be turned off without touching the profile' {
         -Message 'enableRoleAssignments=false must disable the operator RBAC assignments.'
     Assert-Equal -Actual $flags.deployWindowsVm -Expected $true `
         -Message 'Disabling role assignments must not change what is deployed.'
+}
+
+Test-Case 'the expression evaluator supports ARM boolean literals' {
+    Assert-Equal -Actual (Invoke-ArmExpression -Expression '[false()]' -Template $template) `
+        -Expected $false -Message 'false() must evaluate to $false.'
+    Assert-Equal -Actual (Invoke-ArmExpression -Expression '[true()]' -Template $template) `
+        -Expected $true -Message 'true() must evaluate to $true.'
+}
+
+Test-Case 'no profile deploys the Foundry account on its own' {
+    foreach ($profileName in @('core', 'private', 'full')) {
+        $flags = Get-ProfileFeatureFlags -Template $template -ProfileName $profileName
+        Assert-Equal -Actual $flags.deployAiFoundry -Expected $false `
+            -Message "The $profileName profile must leave 'deployAiFoundry' off; catalog membership is not deployment."
+    }
+}
+
+Test-Case 'the aiFoundry override adds Foundry and the Key Vault for its client secret' {
+    $flags = Get-ProfileFeatureFlags -Template $template -ProfileName 'core' -Overrides @{ aiFoundry = $true }
+    Assert-Equal -Actual $flags.deployAiFoundry -Expected $true `
+        -Message 'The aiFoundry override must deploy the Foundry account.'
+    Assert-Equal -Actual $flags.deployKeyVault -Expected $true `
+        -Message 'Enabling aiFoundry must derive the Key Vault that holds the Work IQ client secret.'
+    Assert-Equal -Actual $flags.deployNetwork -Expected $false `
+        -Message 'Enabling aiFoundry must not pull in the network.'
+
+    $enabled = @(Get-EnabledDeployments -Template $template -Flags $flags)
+    Assert-True -Condition ($enabled -contains 'aiFoundry') `
+        -Message 'The ai-foundry module must be gated by deployAiFoundry.'
+}
+
+Test-Case 'the Work IQ Entra bootstrap stays out of the azd deployment' {
+    # The Graph extension does not support what-if, so a Graph resource in
+    # infra/main.bicep would break the `azd provision --preview` gate.
+    $mainSource = Get-Content -LiteralPath $mainBicep -Raw
+    Assert-NotMatch -Actual $mainSource -Pattern '(?m)^\s*extension\s+microsoftGraph' `
+        -Message 'infra/main.bicep must not load the Microsoft Graph extension.'
+
+    $entraSource = Get-Content -LiteralPath (Get-RepoPath 'infra/entra/main.bicep') -Raw
+    foreach ($type in @('Microsoft.Graph/applications', 'Microsoft.Graph/oauth2PermissionGrants',
+            'Microsoft.Graph/groups')) {
+        Assert-Match -Actual $entraSource -Pattern ([regex]::Escape($type)) `
+            -Message "infra/entra/main.bicep must declare '$type'."
+    }
+    Assert-Match -Actual $entraSource -Pattern "consentType:\s*'AllPrincipals'" `
+        -Message 'The Work IQ scope must be consented tenant-wide.'
+    Assert-NotMatch -Actual $entraSource -Pattern 'passwordCredentials' `
+        -Message 'Client secrets are created by the postprovision hook, never in a deployment.'
 }
