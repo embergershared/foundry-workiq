@@ -1,7 +1,7 @@
 # Work IQ on Foundry: automated deployment plan
 
-Status: **Phases 0 and 1 are implemented, not yet deployed to a tenant.
-Phases 2 to 4 are still a plan.**
+Status: **Phases 0 to 2 are implemented and deployed to a sandbox
+environment. Phases 3 and 4 are still a plan.**
 
 Source: [Connect agents to Microsoft 365 with Work IQ (preview), .NET pivot](https://learn.microsoft.com/azure/foundry/agents/how-to/tools/work-iq?pivots=dotnet),
 plus the [Work IQ A2A quickstart](https://learn.microsoft.com/microsoft-365/copilot/extensibility/work-iq-api-quickstart)
@@ -76,7 +76,7 @@ scripts, Bicep and `azd` hooks.
   `uniqueName`). Additional environments can reuse the same app (one redirect
   URI per connection) or get their own app by passing a different `uniqueName`.
 
-## Running Phases 0 and 1
+## Running Phases 0 to 2
 
 ```powershell
 # Once per tenant, as Global Administrator (activate it through PIM first).
@@ -86,7 +86,13 @@ az login --tenant $tenantId
 # Per environment, as the deployer.
 azd env set AZURE_FEATURE_OVERRIDES_JSON '{"aiFoundry":true}'
 azd provision --preview
+azd provision   # the postprovision hook runs scripts/configure-workiq.ps1
 ```
+
+The hook does nothing unless `aiFoundry` deployed a project, and does nothing
+again once the connection exists and the stored secret is tagged with the
+current app. Run `./scripts/configure-workiq.ps1 -Force` to recreate the
+connection with a new secret, for example to rotate it.
 
 The bootstrap runs `az deployment sub create`, so the administrator also needs
 `Microsoft.Resources/deployments/write` on the subscription. Re-running it is
@@ -159,10 +165,14 @@ also deploys the Key Vault. `infra/main.parameters.json` reads
 
 ### Phase 2: Connection wiring (`postprovision` hook, `scripts/configure-workiq.ps1`)
 
-9. **Secret.** If Key Vault has no current `workiq-client-secret`, run
-   `az ad app credential reset --id $WORKIQ_APP_ID --append --display-name foundry-workiq --years 1`
-   and pipe the value straight to `az keyvault secret set` with an
-   `expires` attribute. Never echo it, never `azd env set` it (azd writes
+9. **Secret.** Only when the connection has to be created or recreated, run
+   `az ad app credential reset --id $WORKIQ_APP_ID --append --display-name foundry-workiq-<env> --years 1`
+   and write the value to `workiq-client-secret` with an expiry and a
+   `clientId` tag. The write goes through Azure Resource Manager, not
+   `az keyvault secret set`, because the vault accepts no data-plane traffic
+   from outside its virtual network, and the secret is never read back.
+   After the new connection exists, the environment's older secrets are
+   removed from the app. Never echo it, never `azd env set` it (azd writes
    `.env` files in plain text).
 10. **Connection.** `az rest --method put` to
     `.../accounts/{account}/projects/{project}/connections/{name}?api-version=2025-04-01-preview`
@@ -174,10 +184,12 @@ also deploys the Key Vault. `infra/main.parameters.json` reads
     The connection is immutable: when the client ID or secret changes, the
     hook deletes and recreates it (the article: "You can't edit connection
     fields after creation").
-11. **Redirect URI.** Read `properties.oauthRedirectUrl` from the PUT response,
-    merge it into the app's existing `web.redirectUris` with
-    `az ad app update --web-redirect-uris`, and `azd env set WORKIQ_REDIRECT_URI`
-    so the next bootstrap run passes it to Graph Bicep instead of removing it.
+11. **Redirect URI.** Read the redirect URL from the connection. The article
+    calls it `properties.oauthRedirectUrl`, but api-version
+    `2025-04-01-preview` returns `properties.redirectUrl`, so the hook accepts
+    either. Merge it into the app's existing `web.redirectUris` with a Graph
+    `PATCH`, and `azd env set WORKIQ_REDIRECT_URI`. The bootstrap keeps the
+    app's existing redirect URIs, so a re-run doesn't remove it.
 12. **Why not Bicep for the connection?** The ARM type
     `Microsoft.CognitiveServices/accounts/projects/connections` exists, but
     putting the secret in a deployment parameter stores it in deployment
@@ -242,5 +254,9 @@ also deploys the Key Vault. `infra/main.parameters.json` reads
 - **Redirect URL shape.** It is returned only after the connection exists, so
   the plan treats it as dynamic. If it turns out to be deterministic, it can
   move into `infra/entra/main.bicep` and step 11 goes away.
+- **Connection sharing.** The hook sends `isSharedToAll: true` as the article
+  does, but api-version `2025-04-01-preview` returned the connection with
+  `isSharedToAll: false`. Check with a second member of the Work IQ users
+  group that the connection is usable by them, not only by its creator.
 - **Copilot Credits billing** has no documented API. Revisit if Microsoft adds
   Graph or PowerShell support for spending policies.
