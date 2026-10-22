@@ -19,8 +19,10 @@
     connection has to be created or recreated, written to the vault through
     Azure Resource Manager and passed straight to the connection. It never
     appears in output, on a command line or in the azd environment. When the
-    connection exists and the stored secret is tagged with the current app,
-    only the redirect URI is checked.
+    connection exists, the stored secret is tagged with the current app and it
+    does not expire within -RenewWithinDays, only the redirect URI is checked.
+    A secret that is about to expire is replaced, so a routine `azd provision`
+    rotates it before the connection stops working.
 
 .PARAMETER ConnectionName
     Name of the project connection. Defaults to WORKIQ_CONNECTION_NAME, then
@@ -30,7 +32,11 @@
     Work IQ A2A endpoint.
 
 .PARAMETER SecretLifetimeYears
-    Lifetime of a new client secret. Rotate it before it expires.
+    Lifetime of a new client secret.
+
+.PARAMETER RenewWithinDays
+    Recreate the connection with a new secret when the stored one expires
+    within this many days.
 
 .PARAMETER Force
     Recreate the connection and its secret even when they look current.
@@ -46,6 +52,8 @@ param(
     [string] $Target = 'https://workiq.svc.cloud.microsoft/a2a/',
     [ValidateRange(1, 2)]
     [int] $SecretLifetimeYears = 1,
+    [ValidateRange(1, 180)]
+    [int] $RenewWithinDays = 30,
     [switch] $Force
 )
 
@@ -181,11 +189,26 @@ $secretClientId = if ($storedSecret -and $storedSecret.PSObject.Properties['tags
 }
 else { '' }
 
-$isCurrent = $connection -and $connection.properties.target -eq $Target -and $secretClientId -eq $appId
+# Resource Manager returns the secret's attributes, never its value, so the
+# expiry is read without any data-plane access to the vault.
+$secretExpires = $null
+if ($storedSecret -and $storedSecret.PSObject.Properties['properties'] -and
+    $storedSecret.properties.PSObject.Properties['attributes'] -and
+    $storedSecret.properties.attributes.PSObject.Properties['exp'] -and $storedSecret.properties.attributes.exp) {
+    $secretExpires = [DateTimeOffset]::FromUnixTimeSeconds([long] $storedSecret.properties.attributes.exp)
+}
+$expiresSoon = $secretClientId -eq $appId -and
+    (-not $secretExpires -or $secretExpires -le [DateTimeOffset]::UtcNow.AddDays($RenewWithinDays))
+
+$isCurrent = $connection -and $connection.properties.target -eq $Target -and $secretClientId -eq $appId -and -not $expiresSoon
 if ($isCurrent -and -not $Force) {
-    Write-Output "Connection '$ConnectionName' is current for app $appId."
+    Write-Output "Connection '$ConnectionName' is current for app $appId; its secret expires $($secretExpires.ToString('yyyy-MM-dd'))."
 }
 else {
+    if ($connection -and $expiresSoon -and -not $Force) {
+        $when = if ($secretExpires) { "expires $($secretExpires.ToString('yyyy-MM-dd'))" } else { 'has no expiry date' }
+        Write-Output "The stored client secret $when, within the $RenewWithinDays-day renewal window; rotating it."
+    }
     if ($connection) {
         # The connection's fields can't be edited after creation.
         Write-Output "Recreating connection '$ConnectionName'."

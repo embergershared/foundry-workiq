@@ -91,8 +91,10 @@ azd provision   # the postprovision hook runs scripts/configure-workiq.ps1
 
 The hook does nothing unless `aiFoundry` deployed a project, and does nothing
 again once the connection exists and the stored secret is tagged with the
-current app. Run `./scripts/configure-workiq.ps1 -Force` to recreate the
-connection with a new secret, for example to rotate it.
+current app, unless that secret expires within 30 days (`-RenewWithinDays`):
+then the next `azd provision` rotates it. Run
+`./scripts/configure-workiq.ps1 -Force` to recreate the connection with a new
+secret at any time.
 
 The bootstrap runs `az deployment sub create`, so the administrator also needs
 `Microsoft.Resources/deployments/write` on the subscription. Re-running it is
@@ -171,8 +173,11 @@ also deploys the Key Vault. `infra/main.parameters.json` reads
    `clientId` tag. The write goes through Azure Resource Manager, not
    `az keyvault secret set`, because the vault accepts no data-plane traffic
    from outside its virtual network, and the secret is never read back.
-   After the new connection exists, the environment's older secrets are
-   removed from the app. Never echo it, never `azd env set` it (azd writes
+   A stored secret that expires within `-RenewWithinDays` (default 30)
+   also triggers a recreate; the expiry comes from the Resource Manager
+   view of the secret, which never includes its value. After the new
+   connection exists, the environment's older secrets are removed from the
+   app. Never echo it, never `azd env set` it (azd writes
    `.env` files in plain text).
 10. **Connection.** `az rest --method put` to
     `.../accounts/{account}/projects/{project}/connections/{name}?api-version=2025-04-01-preview`
@@ -196,6 +201,13 @@ also deploys the Key Vault. `infra/main.parameters.json` reads
     history, and the redirect URL then has to round-trip through outputs. Keep
     it in the hook unless a later API version supports Key Vault references
     for OAuth2 connections.
+
+`tests/workiq.tests.ps1` runs the real hook offline against recording `az`
+and `azd` stubs. It covers the no-op, the current connection, renewal,
+replacing a connection whose secret the hook did not store, and a first
+create. For every case it checks that the secret never reaches a command line,
+that the vault is only reached through Resource Manager, that temporary files
+are deleted, and that no URL carries the parentheses `cmd.exe` rejects.
 
 ### Phase 3: The .NET agent (`src/WorkIQAgent`)
 
