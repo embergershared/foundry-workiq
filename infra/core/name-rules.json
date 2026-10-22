@@ -76,6 +76,7 @@
     "managedIdentity": { "maxLength": 128, "minLength": 3, "charset": "^[a-z0-9-]+$", "case": "lower", "scope": "resourceGroup", "class": "regional" },
     "aiFoundry": { "maxLength": 64, "minLength": 2, "charset": "^[a-z0-9-]+$", "case": "lower", "scope": "global", "class": "global" },
     "aiFoundryProject": { "maxLength": 64, "minLength": 2, "charset": "^[a-z0-9-]+$", "case": "lower", "scope": "aiFoundry", "class": "regional" },
+    "apiManagement": { "maxLength": 50, "minLength": 1, "charset": "^[a-z0-9-]+$", "case": "lower", "scope": "global", "class": "global" },
     "mapsAccount": { "maxLength": 98, "minLength": 1, "charset": "^[a-z0-9-]+$", "case": "lower", "scope": "resourceGroup", "class": "regional" }
   },
   "reserved": {

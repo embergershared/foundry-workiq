@@ -1,0 +1,36 @@
+{
+  "name": "api-management",
+  "displayName": "API Management",
+  "description": "Azure API Management v2 instance (Basic v2 by default) to use as the Foundry AI Gateway, with a managed identity, gateway logs in Log Analytics and the Foundry roles for the gateway.",
+  "kind": "resource",
+  "abbreviation": "apim",
+  "featureFlag": "apiManagement",
+  "profiles": [
+    "core",
+    "full",
+    "private"
+  ],
+  "providers": [
+    "Microsoft.ApiManagement"
+  ],
+  "privateEndpoints": [],
+  "roles": [
+    {
+      "name": "Cognitive Services User",
+      "id": "a97b65f3-24c7-4388-baec-2e87135dc908"
+    },
+    {
+      "name": "API Management Service Contributor",
+      "id": "312a565d-c81f-4fd8-895a-4e21e48d571c"
+    },
+    {
+      "name": "Foundry Account Owner",
+      "id": "e47c6f54-e4a2-4754-9501-8e0985b135e1"
+    }
+  ],
+  "nameRule": "global",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

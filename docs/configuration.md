@@ -129,7 +129,7 @@ A `core` deployment therefore performs no `Microsoft.Network` or
 
 Supported Boolean keys are `network`, `keyVault`, `storage`, `bastion`,
 `windowsVm`, `linuxVm`, `natGateway`, `entraLogin`, `shutdownSchedules`,
-`aiFoundry`, and `roleAssignments`.
+`aiFoundry`, `apiManagement`, and `roleAssignments`.
 
 ```powershell
 azd env set AZURE_FEATURE_OVERRIDES_JSON '{"keyVault":true,"storage":true}'
@@ -153,6 +153,14 @@ Dependency rules fail preflight:
   first: the `WORKIQ_APP_ID` and `WORKIQ_USERS_GROUP_ID` azd values, the Work IQ
   service principal, and tenant-wide consent for `WorkIQAgent.Ask`. See
   [Work IQ on Foundry](workiq-deployment-plan.md).
+- `apiManagement` is off in every profile. Enabling it deploys an API
+  Management v2 instance (`AZURE_APIM_SKU`, default `BasicV2`) to link as the
+  Foundry AI Gateway, in the Foundry account's region. Preflight requires
+  `AZURE_APIM_PUBLISHER_EMAIL`. With `aiFoundry` on as well, the instance's
+  identity gets Cognitive Services User on the Foundry account, and the
+  deployer gets API Management Service Contributor on the instance and Foundry
+  Account Owner on the account. Linking it is a one-time Foundry portal step;
+  see the [api-management module](../infra/modules/api-management/README.md).
 - Full-profile Entra extension installation and authentication require NAT
   egress. Do not disable NAT alone.
 - An expert air-gapped deployment **must** set both to false:

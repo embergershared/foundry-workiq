@@ -1,6 +1,7 @@
 {
   "aiFoundry": "aif",
   "aiFoundryProject": "proj",
+  "apiManagement": "apim",
   "applicationInsights": "appins",
   "bastion": "bast",
   "containerApp": "ca",

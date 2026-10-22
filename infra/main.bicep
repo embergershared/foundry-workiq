@@ -95,10 +95,13 @@ param enableShutdownSchedules bool?
 @description('Deploy the Microsoft Foundry account, project and model deployments for the Work IQ agent. Off in every profile; enable it with this parameter or the aiFoundry override. Implies the Key Vault that holds the Work IQ client secret.')
 param enableAiFoundry bool?
 
+@description('Deploy an API Management v2 instance to link as the Foundry AI Gateway. Off in every profile; enable it with this parameter or the apiManagement override. With aiFoundry on, it also grants the roles the gateway and its portal link need.')
+param enableApiManagement bool?
+
 @description('Create configured operator RBAC assignments. Disable when the deployer lacks roleAssignments/write.')
 param enableRoleAssignments bool = true
 
-@description('Base64-encoded JSON object overriding profile feature flags. Supported keys: network, keyVault, storage, bastion, windowsVm, linuxVm, natGateway, entraLogin, shutdownSchedules, aiFoundry, roleAssignments. natGateway and entraLogin must match.')
+@description('Base64-encoded JSON object overriding profile feature flags. Supported keys: network, keyVault, storage, bastion, windowsVm, linuxVm, natGateway, entraLogin, shutdownSchedules, aiFoundry, apiManagement, roleAssignments. natGateway and entraLogin must match.')
 param featureOverridesBase64 string = 'e30='
 
 @description('Comma-separated Entra user or group object IDs that receive VM login and private data-plane roles.')
@@ -165,6 +168,22 @@ param aiFoundryModelDeployments array = [
     capacity: 50
   }
 ]
+
+@description('Azure region for the API Management instance. Defaults to the Foundry account region, so model calls through the gateway stay in one region.')
+param apiManagementLocation string = aiFoundryLocation
+
+@description('API Management v2 tier: BasicV2 for development and test, StandardV2 for production.')
+@allowed([
+  'BasicV2'
+  'StandardV2'
+])
+param apiManagementSku string = 'BasicV2'
+
+@description('API Management publisher email (azd value AZURE_APIM_PUBLISHER_EMAIL). Required when apiManagement is on.')
+param apiManagementPublisherEmail string = ''
+
+@description('API Management publisher organization name.')
+param apiManagementPublisherName string = 'Foundry AI Gateway'
 
 @description('Object ID of the Work IQ users security group from scripts/bootstrap-tenant.ps1. Granted Foundry User on the Foundry account and project.')
 param workIqUsersGroupId string = ''
@@ -384,6 +403,16 @@ var aiFoundryProjectName = azName(
   environmentName,
   ''
 )
+var apiManagementLocationCode = locationCodeFor(apiManagementLocation)
+var apiManagementName = globalName(
+  abbreviations.apiManagement,
+  apiManagementLocationCode,
+  subscriptionCode,
+  environmentName,
+  shortUniqueSuffix,
+  '-',
+  50
+)
 var linuxNicName = azName(
   abbreviations.networkInterface,
   tenantCode,
@@ -419,6 +448,7 @@ var featureSettings = union(
     entraLogin: enableEntraLogin ?? isFull
     shutdownSchedules: enableShutdownSchedules ?? isFull
     aiFoundry: enableAiFoundry ?? false
+    apiManagement: enableApiManagement ?? false
     roleAssignments: enableRoleAssignments
   },
   json(base64ToString(featureOverridesBase64))
@@ -430,6 +460,7 @@ var deployNatGateway = bool(featureSettings.natGateway)
 var deployEntraLogin = bool(featureSettings.entraLogin)
 var deployShutdownSchedules = bool(featureSettings.shutdownSchedules)
 var deployAiFoundry = bool(featureSettings.aiFoundry)
+var deployApiManagement = bool(featureSettings.apiManagement)
 var assignRoles = bool(featureSettings.roleAssignments)
 var deployAnyVm = deployWindowsVm || deployLinuxVm
 
@@ -632,6 +663,22 @@ module aiFoundry './modules/ai-foundry/main.bicep' = if (deployAiFoundry) {
     enableRoleAssignments: assignRoles
   }
 }
+module apiManagement './modules/api-management/main.bicep' = if (deployApiManagement) {
+  name: 'api-management'
+  scope: resourceGroup
+  params: {
+    name: apiManagementName
+    location: apiManagementLocation
+    tags: tags
+    sku: apiManagementSku
+    publisherEmail: apiManagementPublisherEmail
+    publisherName: apiManagementPublisherName
+    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
+    foundryAccountName: deployAiFoundry ? aiFoundry!.outputs.name : ''
+    gatewayAdminPrincipals: deployerPrincipals
+    enableRoleAssignments: assignRoles
+  }
+}
 // #endregion modules
 
 resource deployedKeyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
@@ -653,3 +700,5 @@ output FOUNDRY_ACCOUNT_NAME string = deployAiFoundry ? aiFoundry!.outputs.name :
 output FOUNDRY_PROJECT_NAME string = deployAiFoundry ? aiFoundry!.outputs.projectName : ''
 output FOUNDRY_PROJECT_ID string = deployAiFoundry ? aiFoundry!.outputs.projectId : ''
 output FOUNDRY_PROJECT_ENDPOINT string = deployAiFoundry ? aiFoundry!.outputs.projectEndpoint : ''
+output AZURE_API_MANAGEMENT_NAME string = deployApiManagement ? apiManagement!.outputs.name : ''
+output AZURE_API_MANAGEMENT_GATEWAY_URL string = deployApiManagement ? apiManagement!.outputs.gatewayUrl : ''

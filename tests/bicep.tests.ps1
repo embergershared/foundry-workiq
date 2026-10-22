@@ -26,7 +26,8 @@ $deploymentToModule = @{
     storage    = 'storage'
     bastion    = 'bastion'
     jumpboxes  = 'jumpboxes'
-    aiFoundry  = 'ai-foundry'
+    aiFoundry     = 'ai-foundry'
+    apiManagement = 'api-management'
 }
 
 function Get-BicepFilesUnderTest {
@@ -360,6 +361,31 @@ Test-Case 'the aiFoundry override adds Foundry and the Key Vault for its client 
     $enabled = @(Get-EnabledDeployments -Template $template -Flags $flags)
     Assert-True -Condition ($enabled -contains 'aiFoundry') `
         -Message 'The ai-foundry module must be gated by deployAiFoundry.'
+}
+
+Test-Case 'no profile deploys the API Management gateway on its own' {
+    foreach ($profileName in @('core', 'private', 'full')) {
+        $flags = Get-ProfileFeatureFlags -Template $template -ProfileName $profileName
+        Assert-Equal -Actual $flags.deployApiManagement -Expected $false `
+            -Message "The $profileName profile must leave 'deployApiManagement' off; catalog membership is not deployment."
+    }
+}
+
+Test-Case 'the apiManagement override adds the gateway and nothing else' {
+    $flags = Get-ProfileFeatureFlags -Template $template -ProfileName 'core' -Overrides @{ aiFoundry = $true; apiManagement = $true }
+    Assert-Equal -Actual $flags.deployApiManagement -Expected $true `
+        -Message 'The apiManagement override must deploy the API Management instance.'
+    Assert-Equal -Actual $flags.deployNetwork -Expected $false `
+        -Message 'Enabling apiManagement must not pull in the network.'
+
+    $enabled = @(Get-EnabledDeployments -Template $template -Flags $flags)
+    Assert-True -Condition ($enabled -contains 'apiManagement') `
+        -Message 'The api-management module must be gated by deployApiManagement.'
+
+    $withoutGateway = @(Get-EnabledDeployments -Template $template `
+            -Flags (Get-ProfileFeatureFlags -Template $template -ProfileName 'core' -Overrides @{ aiFoundry = $true }))
+    Assert-True -Condition ($withoutGateway -notcontains 'apiManagement') `
+        -Message 'aiFoundry alone must not deploy the API Management instance.'
 }
 
 Test-Case 'the Work IQ Entra bootstrap stays out of the azd deployment' {
