@@ -300,9 +300,16 @@ if ($featureSettings.aiFoundry) {
         throw "The Work IQ service principal ($workIqAppId) does not exist in this tenant. $bootstrapHint"
     }
 
+    # Resolve the object ID first: on Windows az is a batch file, and cmd.exe
+    # rejects the unquoted parentheses of a servicePrincipals(appId='...') URL.
+    $null = & az ad sp show --id $connectionAppId --only-show-errors --output none 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "The Work IQ app '$connectionAppId' has no service principal in this tenant. $bootstrapHint"
+    }
+    $connectionSpId = (Invoke-AzJson -Arguments @('ad', 'sp', 'show', '--id', $connectionAppId, '--query', 'id')).Trim()
     $grants = Invoke-AzJson -Arguments @(
         'rest', '--method', 'get',
-        '--url', "https://graph.microsoft.com/v1.0/servicePrincipals(appId='$connectionAppId')/oauth2PermissionGrants"
+        '--url', "https://graph.microsoft.com/v1.0/servicePrincipals/$connectionSpId/oauth2PermissionGrants"
     )
     $consented = @($grants.value | Where-Object {
             $_.consentType -eq 'AllPrincipals' -and (" $($_.scope) " -like '* WorkIQAgent.Ask *')

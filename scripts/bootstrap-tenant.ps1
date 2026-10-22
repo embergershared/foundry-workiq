@@ -178,13 +178,17 @@ if ($workIqScopes.Count -eq 0) {
 
 # Keep the redirect URIs already on the app. Each Foundry connection adds its
 # own after it is created, and the Graph deployment would otherwise drop them.
-$existingRedirectUris = @()
-$existingApp = & az rest --method get `
-    --url "https://graph.microsoft.com/v1.0/applications(uniqueName='$AppUniqueName')?`$select=web" `
-    --only-show-errors --output json 2>$null
-if ($LASTEXITCODE -eq 0 -and $existingApp) {
-    $existingRedirectUris = @(($existingApp | ConvertFrom-Json).web.redirectUris)
+# A filter rather than applications(uniqueName='...'): on Windows az is a batch
+# file, and cmd.exe rejects that URL's unquoted parentheses, which would read
+# as "no app yet" and drop every redirect URI.
+$existingApps = @(Invoke-AzJson -Arguments @(
+        'ad', 'app', 'list', '--filter', "uniqueName eq '$AppUniqueName'",
+        '--query', '[].{redirectUris: web.redirectUris}'
+    ))
+if ($existingApps.Count -gt 1) {
+    throw "More than one app registration has the uniqueName '$AppUniqueName'."
 }
+$existingRedirectUris = @($existingApps | ForEach-Object { $_.redirectUris })
 $allRedirectUris = @(@($existingRedirectUris) + @($RedirectUris) |
         Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
         ForEach-Object { $_.Trim() } |
