@@ -98,10 +98,13 @@ param enableAiFoundry bool?
 @description('Deploy an API Management v2 instance to link as the Foundry AI Gateway. Off in every profile; enable it with this parameter or the apiManagement override. With aiFoundry on, it also grants the roles the gateway and its portal link need.')
 param enableApiManagement bool?
 
+@description('Deploy Azure Managed Redis with RediSearch and, with apiManagement on, use it as the gateway external cache that LLM semantic caching needs. Off in every profile; enable it with this parameter or the managedRedis override.')
+param enableManagedRedis bool?
+
 @description('Create configured operator RBAC assignments. Disable when the deployer lacks roleAssignments/write.')
 param enableRoleAssignments bool = true
 
-@description('Base64-encoded JSON object overriding profile feature flags. Supported keys: network, keyVault, storage, bastion, windowsVm, linuxVm, natGateway, entraLogin, shutdownSchedules, aiFoundry, apiManagement, roleAssignments. natGateway and entraLogin must match.')
+@description('Base64-encoded JSON object overriding profile feature flags. Supported keys: network, keyVault, storage, bastion, windowsVm, linuxVm, natGateway, entraLogin, shutdownSchedules, aiFoundry, apiManagement, managedRedis, roleAssignments. natGateway and entraLogin must match.')
 param featureOverridesBase64 string = 'e30='
 
 @description('Comma-separated Entra user or group object IDs that receive VM login and private data-plane roles.')
@@ -184,6 +187,31 @@ param apiManagementPublisherEmail string = ''
 
 @description('API Management publisher organization name.')
 param apiManagementPublisherName string = 'Foundry AI Gateway'
+
+@description('Azure region for Azure Managed Redis. Defaults to the API Management region, because every cached LLM call reads from it.')
+param managedRedisLocation string = apiManagementLocation
+
+@description('Azure Managed Redis SKU (azd value AZURE_REDIS_SKU). Flash Optimized is excluded because it does not support RediSearch.')
+@allowed([
+  'Balanced_B0'
+  'Balanced_B1'
+  'Balanced_B3'
+  'Balanced_B5'
+  'Balanced_B10'
+  'MemoryOptimized_M10'
+  'MemoryOptimized_M20'
+  'ComputeOptimized_X3'
+  'ComputeOptimized_X5'
+  'ComputeOptimized_X10'
+])
+param managedRedisSku string = 'Balanced_B0'
+
+@description('Azure Managed Redis high availability (azd value AZURE_REDIS_HIGH_AVAILABILITY). Required for the SLA; once enabled it cannot be disabled.')
+@allowed([
+  'Enabled'
+  'Disabled'
+])
+param managedRedisHighAvailability string = 'Enabled'
 
 @description('Object ID of the Work IQ users security group from scripts/bootstrap-tenant.ps1. Granted Foundry User on the Foundry account and project.')
 param workIqUsersGroupId string = ''
@@ -413,6 +441,16 @@ var apiManagementName = globalName(
   '-',
   50
 )
+var managedRedisLocationCode = locationCodeFor(managedRedisLocation)
+var managedRedisName = globalName(
+  abbreviations.managedRedis,
+  managedRedisLocationCode,
+  subscriptionCode,
+  environmentName,
+  shortUniqueSuffix,
+  '-',
+  60
+)
 var linuxNicName = azName(
   abbreviations.networkInterface,
   tenantCode,
@@ -449,6 +487,7 @@ var featureSettings = union(
     shutdownSchedules: enableShutdownSchedules ?? isFull
     aiFoundry: enableAiFoundry ?? false
     apiManagement: enableApiManagement ?? false
+    managedRedis: enableManagedRedis ?? false
     roleAssignments: enableRoleAssignments
   },
   json(base64ToString(featureOverridesBase64))
@@ -461,6 +500,7 @@ var deployEntraLogin = bool(featureSettings.entraLogin)
 var deployShutdownSchedules = bool(featureSettings.shutdownSchedules)
 var deployAiFoundry = bool(featureSettings.aiFoundry)
 var deployApiManagement = bool(featureSettings.apiManagement)
+var deployManagedRedis = bool(featureSettings.managedRedis)
 var assignRoles = bool(featureSettings.roleAssignments)
 var deployAnyVm = deployWindowsVm || deployLinuxVm
 
@@ -663,6 +703,18 @@ module aiFoundry './modules/ai-foundry/main.bicep' = if (deployAiFoundry) {
     enableRoleAssignments: assignRoles
   }
 }
+module managedRedis './modules/managed-redis/main.bicep' = if (deployManagedRedis) {
+  name: 'managed-redis'
+  scope: resourceGroup
+  params: {
+    name: managedRedisName
+    location: managedRedisLocation
+    tags: tags
+    sku: managedRedisSku
+    highAvailability: managedRedisHighAvailability
+    logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
+  }
+}
 module apiManagement './modules/api-management/main.bicep' = if (deployApiManagement) {
   name: 'api-management'
   scope: resourceGroup
@@ -676,6 +728,7 @@ module apiManagement './modules/api-management/main.bicep' = if (deployApiManage
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
     foundryAccountName: deployAiFoundry ? aiFoundry!.outputs.name : ''
     gatewayAdminPrincipals: deployerPrincipals
+    externalRedisName: deployManagedRedis ? managedRedis!.outputs.name : ''
     enableRoleAssignments: assignRoles
   }
 }
@@ -702,3 +755,5 @@ output FOUNDRY_PROJECT_ID string = deployAiFoundry ? aiFoundry!.outputs.projectI
 output FOUNDRY_PROJECT_ENDPOINT string = deployAiFoundry ? aiFoundry!.outputs.projectEndpoint : ''
 output AZURE_API_MANAGEMENT_NAME string = deployApiManagement ? apiManagement!.outputs.name : ''
 output AZURE_API_MANAGEMENT_GATEWAY_URL string = deployApiManagement ? apiManagement!.outputs.gatewayUrl : ''
+output AZURE_MANAGED_REDIS_NAME string = deployManagedRedis ? managedRedis!.outputs.name : ''
+output AZURE_MANAGED_REDIS_HOST_NAME string = deployManagedRedis ? managedRedis!.outputs.hostName : ''

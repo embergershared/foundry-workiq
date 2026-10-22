@@ -38,6 +38,12 @@
     "apiManagementSku": {
       "value": "${AZURE_APIM_SKU=BasicV2}"
     },
+    "managedRedisSku": {
+      "value": "${AZURE_REDIS_SKU=Balanced_B0}"
+    },
+    "managedRedisHighAvailability": {
+      "value": "${AZURE_REDIS_HIGH_AVAILABILITY=Enabled}"
+    },
     "createdOn": {
       "value": "${AZURE_CREATED_ON}"
     },

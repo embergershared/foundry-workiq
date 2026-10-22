@@ -11,6 +11,7 @@
   "linuxVirtualMachine": "vm-lin",
   "logAnalytics": "law",
   "managedIdentity": "id",
+  "managedRedis": "amr",
   "mapsAccount": "map",
   "natGateway": "natgw",
   "networkInterface": "nic",
