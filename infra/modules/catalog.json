@@ -266,6 +266,31 @@
       }
     },
     {
+      "name": "managed-redis",
+      "displayName": "Azure Managed Redis",
+      "description": "Azure Managed Redis cluster with the RediSearch module, used as the external cache that API Management needs for LLM semantic caching.",
+      "kind": "resource",
+      "abbreviation": "amr",
+      "additionalAbbreviations": [],
+      "featureFlag": "managedRedis",
+      "profiles": [
+        "core",
+        "full",
+        "private"
+      ],
+      "providers": [
+        "Microsoft.Cache"
+      ],
+      "nameRule": "global",
+      "path": "infra/modules/managed-redis/main.bicep",
+      "privateEndpoints": [],
+      "roles": [],
+      "preflight": {
+        "checks": [],
+        "requiresOperatorPrincipals": false
+      }
+    },
+    {
       "name": "maps",
       "displayName": "Maps",
       "description": "Azure Maps Gen2 account for search and routing, accessed with Microsoft Entra ID.",

@@ -28,6 +28,7 @@ $deploymentToModule = @{
     jumpboxes  = 'jumpboxes'
     aiFoundry     = 'ai-foundry'
     apiManagement = 'api-management'
+    managedRedis  = 'managed-redis'
 }
 
 function Get-BicepFilesUnderTest {
@@ -405,4 +406,37 @@ Test-Case 'the Work IQ Entra bootstrap stays out of the azd deployment' {
         -Message 'The Work IQ scope must be consented tenant-wide.'
     Assert-NotMatch -Actual $entraSource -Pattern 'passwordCredentials' `
         -Message 'Client secrets are created by the postprovision hook, never in a deployment.'
+}
+
+Test-Case 'no profile deploys Azure Managed Redis on its own' {
+    foreach ($profileName in @('core', 'private', 'full')) {
+        $flags = Get-ProfileFeatureFlags -Template $template -ProfileName $profileName
+        Assert-Equal -Actual $flags.deployManagedRedis -Expected $false `
+            -Message "The $profileName profile must leave 'deployManagedRedis' off; catalog membership is not deployment."
+    }
+}
+
+Test-Case 'the managedRedis override adds the cache and hands it to the gateway' {
+    $flags = Get-ProfileFeatureFlags -Template $template -ProfileName 'core' `
+        -Overrides @{ aiFoundry = $true; apiManagement = $true; managedRedis = $true }
+    Assert-Equal -Actual $flags.deployManagedRedis -Expected $true `
+        -Message 'The managedRedis override must deploy Azure Managed Redis.'
+    Assert-Equal -Actual $flags.deployNetwork -Expected $false `
+        -Message 'Enabling managedRedis must not pull in the network.'
+
+    $enabled = @(Get-EnabledDeployments -Template $template -Flags $flags)
+    Assert-True -Condition ($enabled -contains 'managedRedis') `
+        -Message 'The managed-redis module must be gated by deployManagedRedis.'
+
+    $withoutCache = @(Get-EnabledDeployments -Template $template `
+            -Flags (Get-ProfileFeatureFlags -Template $template -ProfileName 'core' -Overrides @{ aiFoundry = $true; apiManagement = $true }))
+    Assert-True -Condition ($withoutCache -notcontains 'managedRedis') `
+        -Message 'apiManagement alone must not deploy Azure Managed Redis.'
+
+    # The gateway gets the cache only when it is deployed, so the external
+    # cache entry never points at a cluster that doesn't exist.
+    # A conditional module parameter compiles to if(..., createObject('value', ...), ...).
+    $externalRedis = $template.resources.apiManagement.properties.parameters.externalRedisName | ConvertTo-Json -Compress
+    Assert-Match -Actual $externalRedis -Pattern "variables\('deployManagedRedis'\)" `
+        -Message 'The gateway external cache must be gated by deployManagedRedis.'
 }

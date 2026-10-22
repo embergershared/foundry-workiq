@@ -1,0 +1,23 @@
+{
+  "name": "managed-redis",
+  "displayName": "Azure Managed Redis",
+  "description": "Azure Managed Redis cluster with the RediSearch module, used as the external cache that API Management needs for LLM semantic caching.",
+  "kind": "resource",
+  "abbreviation": "amr",
+  "featureFlag": "managedRedis",
+  "profiles": [
+    "core",
+    "full",
+    "private"
+  ],
+  "providers": [
+    "Microsoft.Cache"
+  ],
+  "privateEndpoints": [],
+  "roles": [],
+  "nameRule": "global",
+  "preflight": {
+    "checks": [],
+    "requiresOperatorPrincipals": false
+  }
+}

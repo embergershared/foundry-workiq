@@ -129,7 +129,7 @@ A `core` deployment therefore performs no `Microsoft.Network` or
 
 Supported Boolean keys are `network`, `keyVault`, `storage`, `bastion`,
 `windowsVm`, `linuxVm`, `natGateway`, `entraLogin`, `shutdownSchedules`,
-`aiFoundry`, `apiManagement`, and `roleAssignments`.
+`aiFoundry`, `apiManagement`, `managedRedis`, and `roleAssignments`.
 
 ```powershell
 azd env set AZURE_FEATURE_OVERRIDES_JSON '{"keyVault":true,"storage":true}'
@@ -161,6 +161,14 @@ Dependency rules fail preflight:
   deployer gets API Management Service Contributor on the instance and Foundry
   Account Owner on the account. Linking it is a one-time Foundry portal step;
   see the [api-management module](../infra/modules/api-management/README.md).
+- `managedRedis` is off in every profile. Enabling it deploys Azure Managed
+  Redis with the RediSearch module (`AZURE_REDIS_SKU`, default `Balanced_B0`;
+  `AZURE_REDIS_HIGH_AVAILABILITY`, default `Enabled`) in the API Management
+  region. With `apiManagement` on as well, the gateway uses it as its default
+  external cache, which LLM semantic caching needs. RediSearch and the
+  clustering policy can't be added after creation, so preflight stops when an
+  existing cache for the environment lacks them; see the
+  [managed-redis module](../infra/modules/managed-redis/README.md).
 - Full-profile Entra extension installation and authentication require NAT
   egress. Do not disable NAT alone.
 - An expert air-gapped deployment **must** set both to false:

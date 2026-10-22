@@ -105,6 +105,7 @@ a module has been provisioned anywhere, changing them replaces resources.
 | [`jumpboxes`](../infra/modules/jumpboxes/README.md) | composite | `vm-win`, `vm-lin`, `nic` | `full` | `windowsVm` | `Microsoft.Compute`, `Microsoft.DevTestLab`, `Microsoft.Network` |
 | [`key-vault`](../infra/modules/key-vault/README.md) | resource | `kv` | `core`, `full`, `private` | `keyVault` | `Microsoft.KeyVault` |
 | [`managed-identity`](../infra/modules/managed-identity/README.md) | resource | `id` | `core`, `full`, `private` | `managedIdentity` | `Microsoft.ManagedIdentity` |
+| [`managed-redis`](../infra/modules/managed-redis/README.md) | resource | `amr` | `core`, `full`, `private` | `managedRedis` | `Microsoft.Cache` |
 | [`maps`](../infra/modules/maps/README.md) | resource | `map` | `core`, `full`, `private` | `maps` | `Microsoft.Maps` |
 | [`monitoring`](../infra/modules/monitoring/README.md) | composite | `law` | `core`, `full`, `private` | – | `Microsoft.Insights`, `Microsoft.OperationalInsights` |
 | [`nat-gateway`](../infra/modules/nat-gateway/README.md) | resource | `natgw` | `full`, `private` | `natGateway` | `Microsoft.Network` |

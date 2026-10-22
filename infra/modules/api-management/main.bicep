@@ -15,6 +15,13 @@
 //     instance and Foundry Account Owner on the Foundry account, the two roles
 //     the portal link needs.
 //
+// With externalRedisName, the instance also uses that Azure Managed Redis
+// cluster as its default external cache, which the LLM semantic caching
+// policies need. API Management only connects to it with an access key, so
+// the connection string is read with listKeys() at deployment time and stored
+// by API Management as a secret named value; the key is never a parameter or
+// an output.
+//
 // The instance name is also its *.azure-api.net host name, which must be
 // globally unique: build it with globalName(abbreviations.apiManagement, ...,
 // '-', 50).
@@ -59,6 +66,9 @@ param foundryAccountName string = ''
 @description('Principals that link the gateway in the Foundry portal and manage its token limits: [{ principalId, principalType }].')
 param gatewayAdminPrincipals principal[] = []
 
+@description('Azure Managed Redis cluster in this resource group, with RediSearch on its default database, to use as the external cache. Empty keeps the built-in cache only.')
+param externalRedisName string = ''
+
 @description('Create the role assignments above. Disable when the deployer lacks roleAssignments/write.')
 param enableRoleAssignments bool = true
 
@@ -85,6 +95,7 @@ var foundryAccountOwnerRoleId = subscriptionResourceId(
   'e47c6f54-e4a2-4754-9501-8e0985b135e1'
 )
 var frontsFoundry = !empty(foundryAccountName)
+var usesExternalRedis = !empty(externalRedisName)
 
 resource apiManagement 'Microsoft.ApiManagement/service@2024-05-01' = {
   name: name
@@ -164,6 +175,28 @@ resource foundryAccountOwnerAssignments 'Microsoft.Authorization/roleAssignments
     }
   }
 ]
+
+resource externalRedis 'Microsoft.Cache/redisEnterprise@2025-04-01' existing = if (usesExternalRedis) {
+  name: usesExternalRedis ? externalRedisName : 'unused'
+}
+
+resource externalRedisDatabase 'Microsoft.Cache/redisEnterprise/databases@2025-04-01' existing = if (usesExternalRedis) {
+  parent: externalRedis
+  name: 'default'
+}
+
+// 'default' is the cache every gateway location uses unless a location has
+// its own entry, which is what the semantic caching policies look up.
+resource externalCache 'Microsoft.ApiManagement/service/caches@2024-05-01' = if (usesExternalRedis) {
+  parent: apiManagement
+  name: 'default'
+  properties: {
+    description: 'Azure Managed Redis ${externalRedisName}, with RediSearch for semantic caching'
+    useFromLocation: 'default'
+    connectionString: '${externalRedis!.properties.hostName}:${externalRedisDatabase!.properties.port},password=${externalRedisDatabase!.listKeys().primaryKey},ssl=True,abortConnect=False'
+    resourceId: '${environment().resourceManager}${substring(externalRedis!.id, 1)}'
+  }
+}
 
 @description('Resource ID.')
 output id string = apiManagement.id

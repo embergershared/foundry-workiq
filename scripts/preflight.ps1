@@ -97,6 +97,7 @@ $featureSettings = [ordered] @{
     shutdownSchedules = $isFull
     aiFoundry         = $false
     apiManagement     = $false
+    managedRedis      = $false
     roleAssignments   = $true
 }
 
@@ -155,6 +156,7 @@ $moduleEnabled = @{
     'jumpboxes'   = $anyVm
     'ai-foundry'     = [bool] $featureSettings.aiFoundry
     'api-management' = [bool] $featureSettings.apiManagement
+    'managed-redis'  = [bool] $featureSettings.managedRedis
 }
 
 $enabledModules = @(Get-EnabledCatalogModules -Modules $catalog.modules -Features $featureSettings -Composition $moduleEnabled)
@@ -296,6 +298,51 @@ if ($featureSettings.apiManagement) {
     }
     if (-not $featureSettings.aiFoundry) {
         Write-Warning 'apiManagement is on without aiFoundry: the instance deploys, but there is no Foundry account to link it to or to grant roles on.'
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Azure Managed Redis checks - skipped entirely unless the cache is deployed
+# ---------------------------------------------------------------------------
+
+if ($featureSettings.managedRedis) {
+    $redisSkus = @(
+        'Balanced_B0', 'Balanced_B1', 'Balanced_B3', 'Balanced_B5', 'Balanced_B10',
+        'MemoryOptimized_M10', 'MemoryOptimized_M20',
+        'ComputeOptimized_X3', 'ComputeOptimized_X5', 'ComputeOptimized_X10'
+    )
+    $redisSku = (& azd env get-value AZURE_REDIS_SKU 2>$null)
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($redisSku) -and $redisSku.Trim() -cnotin $redisSkus) {
+        throw "AZURE_REDIS_SKU '$($redisSku.Trim())' is not supported. RediSearch needs a Balanced, Memory Optimized or Compute Optimized SKU: $($redisSkus -join ', ')."
+    }
+    $redisHighAvailability = (& azd env get-value AZURE_REDIS_HIGH_AVAILABILITY 2>$null)
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($redisHighAvailability) -and
+        $redisHighAvailability.Trim() -cnotin @('Enabled', 'Disabled')) {
+        throw "AZURE_REDIS_HIGH_AVAILABILITY must be Enabled or Disabled; received '$($redisHighAvailability.Trim())'."
+    }
+    if (-not $featureSettings.apiManagement) {
+        Write-Warning 'managedRedis is on without apiManagement: the cache deploys, but no gateway uses it as its external cache.'
+    }
+
+    # Redis fixes modules and the clustering policy when a database is created.
+    # An existing cache for this environment without them can't be fixed by a
+    # redeploy, so stop here rather than let Resource Manager fail with a
+    # less specific error.
+    # Filtered here: az resource list rejects --tag together with --resource-type.
+    $existingClusters = @(Invoke-AzJson -Arguments @(
+            'resource', 'list', '--subscription', $subscriptionId,
+            '--resource-type', 'Microsoft.Cache/redisEnterprise'
+        ) | Where-Object { $_.tags -and $_.tags.PSObject.Properties['azd-env-name'] -and $_.tags.'azd-env-name' -eq $environmentName } |
+            ForEach-Object { $_.id })
+    foreach ($clusterId in $existingClusters) {
+        $database = Invoke-AzJson -Arguments @(
+            'rest', '--method', 'get',
+            '--url', "https://management.azure.com$clusterId/databases/default?api-version=2025-04-01"
+        )
+        $moduleNames = @($database.properties.modules | ForEach-Object { $_.name })
+        if ($moduleNames -notcontains 'RediSearch' -or $database.properties.clusteringPolicy -ne 'EnterpriseCluster') {
+            throw "Azure Managed Redis '$($clusterId.Split('/')[-1])' has no RediSearch module or uses the '$($database.properties.clusteringPolicy)' clustering policy, and neither can change after creation. Delete it, or point this environment elsewhere, before provisioning."
+        }
     }
 }
 

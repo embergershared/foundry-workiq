@@ -60,6 +60,7 @@ deploys with only its own role.
 | `logAnalyticsWorkspaceId` | string | no | Sends all gateway logs, including LLM logs, to resource-specific tables |
 | `foundryAccountName` | string | no | Foundry account in the same resource group |
 | `gatewayAdminPrincipals` | principal[] | no | `[{ principalId, principalType }]` |
+| `externalRedisName` | string | no | Azure Managed Redis cluster in the same resource group, with RediSearch, to use as the default external cache for LLM semantic caching; see the [managed-redis module](../managed-redis/README.md). The connection string is read with `listKeys()` and stored by API Management as a secret named value |
 | `enableRoleAssignments` | bool | no | Default `true` |
 
 ## Outputs
