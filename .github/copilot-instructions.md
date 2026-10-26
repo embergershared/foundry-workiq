@@ -210,7 +210,9 @@ automations remain separate.
   or `.env.template` for schema information. Never write credentials, tokens,
   connection strings, private keys, email addresses, or other PII into
   committed `.squad/` state.
-- For Squad issue work, use `squad/<issue-number>-<kebab-case-slug>` branches,
-  reference the issue with `Closes #<number>`, and follow decisions recorded in
+- For issue work, Squad issue work included, use
+  `emberger/<type>/<issue-number>-<kebab-case-slug>` branches, never `squad/`.
+  Never commit or push to `main` directly: changes reach it only through a PR.
+  Reference the issue with `Closes #<number>`, and follow decisions recorded in
   `.squad/decisions.md`. This repository currently has only `main`; do not apply
   the upstream Squad CLI skill's `dev`/`insiders` branch model here.
